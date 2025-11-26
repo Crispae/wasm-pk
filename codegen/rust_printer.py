@@ -2,6 +2,7 @@
 """Custom Rust code printer for SymPy expressions"""
 
 import re
+import sympy
 from sympy.printing.rust import RustCodePrinter
 from ..core.base import CodeGenerator
 
@@ -13,6 +14,7 @@ class CustomRustCodePrinter(RustCodePrinter):
         """Handle power operations correctly for Rust
 
         Uses .powi() for integer exponents and .powf() for float exponents
+        Guards against division by zero for negative exponents
 
         Args:
             expr: SymPy Pow expression
@@ -23,11 +25,23 @@ class CustomRustCodePrinter(RustCodePrinter):
         base = self._print(expr.base)
         exp = expr.exp
 
+        # Check if base needs parentheses (for Add, Mul, etc.)
+        # This ensures correct operator precedence in Rust
+        needs_parens = isinstance(expr.base, (sympy.Add, sympy.Mul))
+        if needs_parens and not base.startswith('('):
+            base = f"({base})"
+
         # Check if exponent is an integer
         if exp.is_integer:
             # Use powi with integer literal
             if exp.is_number:
-                return f"{base}.powi({int(exp)})"
+                exp_val = int(exp)
+                # Guard against division by zero for negative exponents
+                # when the base could be zero (contains Piecewise)
+                if exp_val < 0 and expr.base.has(sympy.Piecewise):
+                    # Generate safe division
+                    return f"(if {base} != 0.0 {{ {base}.powi({exp_val}) }} else {{ f64::INFINITY }})"
+                return f"{base}.powi({exp_val})"
             else:
                 # If it's a symbol that represents an integer, cast it
                 return f"{base}.powi({self._print(exp)} as i32)"

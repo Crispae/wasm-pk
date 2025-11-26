@@ -1,4 +1,4 @@
-import init, { run_simulation } from 'sbml-wasm';
+import init, { run_simulation } from 'sbml_wasm_project';
 import { readFileSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -12,7 +12,7 @@ async function testWASM() {
     try {
         // Initialize the WASM module with file path
         console.log("📦 Loading WASM module...");
-        const wasmPath = join(__dirname, 'node_modules', 'sbml-wasm', 'sbml_model_bg.wasm');
+        const wasmPath = join(__dirname, 'node_modules', 'sbml_wasm_project', 'sbml_model_bg.wasm');
         const wasmBuffer = readFileSync(wasmPath);
         await init({ module_or_path: wasmBuffer });
         console.log("✅ WASM module loaded successfully\n");

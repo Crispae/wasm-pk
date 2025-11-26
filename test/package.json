@@ -1,12 +1,9 @@
 {
-  "name": "sbml-wasm-test",
-  "version": "1.0.0",
-  "description": "Test suite for SBML WASM package",
   "type": "module",
   "scripts": {
     "test": "node test_wasm.js"
   },
   "dependencies": {
-    "sbml-wasm": "file:../pkg"
+    "sbml_wasm_project": "file:../pkg"
   }
 }
