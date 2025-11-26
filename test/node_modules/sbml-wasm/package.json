@@ -1,0 +1,15 @@
+{
+  "name": "sbml_wasm_project",
+  "type": "module",
+  "version": "0.1.0",
+  "files": [
+    "sbml_model_bg.wasm",
+    "sbml_model.js",
+    "sbml_model.d.ts"
+  ],
+  "main": "sbml_model.js",
+  "types": "sbml_model.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
