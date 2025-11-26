@@ -74,6 +74,52 @@ with open("my_model.rs", "w") as f:
     f.write(rust_code)
 ```
 
+## Docker WASM Build
+
+After generating Rust code, you can compile it to WebAssembly using Docker.
+
+### Prerequisites
+- Docker installed and running
+- Generated Rust file (e.g., from the Jupyter notebook)
+
+### Building the Docker Image
+
+```bash
+docker build -t sbml-wasm .
+```
+
+### Running the Container
+
+**PowerShell (Windows)**
+```powershell
+docker run -v ${PWD}:/app sbml-wasm /app/Notebooks/output/euromix_model.rs /app/pkg
+```
+
+**Bash/Linux/Mac**
+```bash
+docker run -v $(pwd):/app sbml-wasm /app/Notebooks/output/euromix_model.rs /app/pkg
+```
+
+### Arguments
+1. First argument: Path to the input Rust file (relative to /app in container)
+2. Second argument: Output directory for the WASM package (relative to /app in container)
+
+### Output
+The WASM package will be created in the specified output directory with:
+- `sbml_model_bg.wasm` - The compiled WebAssembly binary
+- `sbml_model.js` - JavaScript bindings
+- `sbml_model.d.ts` - TypeScript definitions
+- `package.json` - NPM package metadata
+
+### Example Workflow
+
+1. Generate Rust code using the notebook
+2. Build Docker image: `docker build -t sbml-wasm .`
+3. Run the build:
+   - **PowerShell**: `docker run -v ${PWD}:/app sbml-wasm /app/Notebooks/output/euromix_model.rs /app/pkg`
+   - **Bash**: `docker run -v $(pwd):/app sbml-wasm /app/Notebooks/output/euromix_model.rs /app/pkg`
+4. The WASM package will be in the `pkg/` directory
+
 ## Usage Examples
 
 ### Basic Conversion
@@ -247,10 +293,5 @@ To add a new backend (e.g., C code generation):
 3. Create template manager in `codegen/c_template.py`
 4. Update facade to support new backend
 
-## License
 
-This is part of the larger SBML parsing project.
 
-## Authors
-
-Refactored from the original monolithic implementation by Claude (Anthropic).
