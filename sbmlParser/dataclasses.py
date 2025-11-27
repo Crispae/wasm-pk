@@ -379,7 +379,8 @@ class ReactionData:
     def __init__(self):
         self.Id = None
         self.reactionIndex = None  # used in the logic for setting up stoichCoeffMat
-        self.reactants = None  # includes products
+        self.reactants = None  # reactants only
+        self.products = None  # products in separate list
         self.rateLaw = None
         self.rxnParameters = None
         self.name = None
@@ -390,6 +391,7 @@ class ReactionData:
             "Id": self.Id,
             "name": self.name,
             "reactants": self.reactants,
+            "products": self.products,
             "rxnParameters": self.rxnParameters,
             "rateLaw": self.rateLaw,
         }
@@ -402,6 +404,7 @@ class ReactionData:
         newComponent.Id = dataDict["Id"]
         newComponent.name = dataDict["name"]
         newComponent.reactants = dataDict["reactants"]
+        newComponent.products = dataDict.get("products", [])
         newComponent.rxnParameters = dataDict["rxnParameters"]
         newComponent.rateLaw = dataDict["rateLaw"]
 

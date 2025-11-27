@@ -15,8 +15,8 @@ venv/
 .idea/
 
 # Generated Output
+pkg/
 output/
-*.rs
 
 # OS
 .DS_Store
