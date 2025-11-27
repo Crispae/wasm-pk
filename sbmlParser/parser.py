@@ -132,9 +132,10 @@ def ParseReaction(reactionIndex, reaction):
     numProducts = reaction.getListOfProducts().size()
 
     newReaction.reactants = []
+    newReaction.products = []
     i = 0
     for i in range(numReactants):
-        reactantStoich = -float(reaction.getListOfReactants().get(i).getStoichiometry())
+        reactantStoich = float(reaction.getListOfReactants().get(i).getStoichiometry())
         reactantSpecies = reaction.getListOfReactants().get(i).getSpecies()
 
         newReaction.reactants.append([reactantStoich, reactantSpecies])
@@ -145,7 +146,7 @@ def ParseReaction(reactionIndex, reaction):
         #        productsString += " , "
         productSpecies = reaction.getListOfProducts().get(i).getSpecies()
 
-        newReaction.reactants.append([productStoich, productSpecies])
+        newReaction.products.append([productStoich, productSpecies])
 
     rateLawObject = reaction.getKineticLaw()
 
