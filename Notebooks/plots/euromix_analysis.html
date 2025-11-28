@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Euromix Model Analysis Dashboard</title>
+    <script src="https://cdn.plot.ly/plotly-2.26.0.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .controls {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        label {
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        select, input {
+            padding: 8px 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 5px;
+            font-size: 14px;
+            background: white;
+        }
+        
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .stats-panel {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-bottom: 2px solid #e9ecef;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .stat-label {
+            font-size: 0.85em;
+            color: #6c757d;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+        
+        .stat-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        .plot-container {
+            padding: 30px;
+        }
+        
+        .plot-section {
+            margin-bottom: 40px;
+        }
+        
+        .plot-title {
+            font-size: 1.5em;
+            color: #495057;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+        
+        #mainPlot {
+            height: 600px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        #comparisonPlot {
+            height: 500px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .species-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .species-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px;
+            background: white;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .species-checkbox:hover {
+            background: #e9ecef;
+        }
+        
+        .species-checkbox input[type="checkbox"] {
+            cursor: pointer;
+        }
+        
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 30px;
+        }
+        
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 Euromix PBPK Model Analysis</h1>
+            <p>Interactive Dashboard for Simulation Results</p>
+        </div>
+        
+        <div id="loading" class="info" style="margin: 20px 30px;">
+            Loading data...
+        </div>
+        
+        <div id="content" style="display: none;">
+            <div class="stats-panel" id="statsPanel"></div>
+            
+            <div class="controls">
+                <div class="control-group">
+                    <label for="speciesSelect">Select Species:</label>
+                    <select id="speciesSelect" multiple style="min-width: 200px; height: 100px;">
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="plotType">Plot Type:</label>
+                    <select id="plotType">
+                        <option value="line">Line Plot</option>
+                        <option value="scatter">Scatter Plot</option>
+                        <option value="log">Log Scale</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="timeRange">Time Range:</label>
+                    <input type="number" id="timeMin" placeholder="Min" step="0.1" style="width: 80px;">
+                    <span>to</span>
+                    <input type="number" id="timeMax" placeholder="Max" step="0.1" style="width: 80px;">
+                </div>
+                <div class="control-group">
+                    <button onclick="updatePlots()" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">
+                        Update Plots
+                    </button>
+                    <button onclick="selectAll()" style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">
+                        Select All
+                    </button>
+                    <button onclick="deselectAll()" style="padding: 10px 20px; background: #dc3545; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: 600;">
+                        Deselect All
+                    </button>
+                </div>
+            </div>
+            
+            <div class="plot-container">
+                <div class="plot-section">
+                    <h2 class="plot-title">Species Concentration Over Time</h2>
+                    <div id="mainPlot"></div>
+                </div>
+                
+                <div class="plot-section">
+                    <h2 class="plot-title">Species Comparison</h2>
+                    <div id="comparisonPlot"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let data = null;
+        let time = [];
+        let species = {};
+        
+        // Color palette for species
+        const colors = [
+            '#667eea', '#764ba2', '#f093fb', '#4facfe', '#00f2fe',
+            '#43e97b', '#fa709a', '#fee140', '#30cfd0', '#330867',
+            '#a8edea', '#fed6e3', '#ff9a9e', '#fecfef', '#fecfef'
+        ];
+        
+        // Load JSON data
+        async function loadData() {
+            try {
+                const response = await fetch('euromix.json');
+                data = await response.json();
+                time = data.time;
+                species = data.species;
+                
+                // Populate species selector
+                const select = document.getElementById('speciesSelect');
+                Object.keys(species).forEach((name, index) => {
+                    const option = document.createElement('option');
+                    option.value = name;
+                    option.textContent = name;
+                    option.selected = index < 5; // Select first 5 by default
+                    select.appendChild(option);
+                });
+                
+                // Set default time range
+                document.getElementById('timeMin').value = time[0];
+                document.getElementById('timeMax').value = time[time.length - 1];
+                
+                // Calculate and display statistics
+                displayStats();
+                
+                // Create initial plots
+                updatePlots();
+                
+                // Hide loading, show content
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('content').style.display = 'block';
+                
+            } catch (error) {
+                document.getElementById('loading').innerHTML = 
+                    '<div class="warning">Error loading data: ' + error.message + 
+                    '<br>Make sure euromix.json is in the same directory as this HTML file.</div>';
+            }
+        }
+        
+        function displayStats() {
+            const statsPanel = document.getElementById('statsPanel');
+            const speciesCount = Object.keys(species).length;
+            const timePoints = time.length;
+            const timeRange = time[time.length - 1] - time[0];
+            
+            // Calculate non-zero species count
+            let nonZeroCount = 0;
+            Object.values(species).forEach(values => {
+                if (values.some(v => v !== 0)) nonZeroCount++;
+            });
+            
+            statsPanel.innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-label">Total Species</div>
+                    <div class="stat-value">${speciesCount}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Time Points</div>
+                    <div class="stat-value">${timePoints}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Time Range</div>
+                    <div class="stat-value">${timeRange.toFixed(2)} hrs</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Active Species</div>
+                    <div class="stat-value">${nonZeroCount}</div>
+                </div>
+            `;
+            
+            if (nonZeroCount === 0) {
+                statsPanel.innerHTML += `
+                    <div class="stat-card" style="grid-column: 1 / -1;">
+                        <div class="warning" style="margin: 0;">
+                            ⚠️ All species values are zero. This may indicate initial conditions or a baseline state.
+                        </div>
+                    </div>
+                `;
+            }
+        }
+        
+        function getSelectedSpecies() {
+            const select = document.getElementById('speciesSelect');
+            return Array.from(select.selectedOptions).map(opt => opt.value);
+        }
+        
+        function filterByTimeRange(timeArray, valuesArray, minTime, maxTime) {
+            const filtered = {
+                time: [],
+                values: []
+            };
+            
+            for (let i = 0; i < timeArray.length; i++) {
+                if (timeArray[i] >= minTime && timeArray[i] <= maxTime) {
+                    filtered.time.push(timeArray[i]);
+                    filtered.values.push(valuesArray[i]);
+                }
+            }
+            
+            return filtered;
+        }
+        
+        function updatePlots() {
+            const selectedSpecies = getSelectedSpecies();
+            if (selectedSpecies.length === 0) {
+                alert('Please select at least one species to plot.');
+                return;
+            }
+            
+            const plotType = document.getElementById('plotType').value;
+            const minTime = parseFloat(document.getElementById('timeMin').value) || time[0];
+            const maxTime = parseFloat(document.getElementById('timeMax').value) || time[time.length - 1];
+            
+            // Prepare traces for main plot
+            const traces = selectedSpecies.map((name, index) => {
+                const filtered = filterByTimeRange(time, species[name], minTime, maxTime);
+                
+                const trace = {
+                    x: filtered.time,
+                    y: filtered.values,
+                    name: name,
+                    type: plotType === 'scatter' ? 'scatter' : 'scatter',
+                    mode: plotType === 'scatter' ? 'markers' : 'lines+markers',
+                    line: plotType === 'scatter' ? undefined : { width: 2 },
+                    marker: { size: plotType === 'scatter' ? 4 : 3 },
+                    yaxis: plotType === 'log' ? 'y2' : 'y'
+                };
+                
+                return trace;
+            });
+            
+            const layout = {
+                title: {
+                    text: 'Species Concentration Over Time',
+                    font: { size: 20, color: '#495057' }
+                },
+                xaxis: {
+                    title: 'Time (hours)',
+                    gridcolor: '#e9ecef',
+                    showgrid: true
+                },
+                yaxis: {
+                    title: 'Concentration',
+                    type: plotType === 'log' ? 'log' : 'linear',
+                    gridcolor: '#e9ecef',
+                    showgrid: true
+                },
+                hovermode: 'closest',
+                plot_bgcolor: 'white',
+                paper_bgcolor: 'white',
+                legend: {
+                    x: 1.05,
+                    y: 1,
+                    bgcolor: 'rgba(255,255,255,0.8)',
+                    bordercolor: '#dee2e6',
+                    borderwidth: 1
+                },
+                margin: { r: 200 }
+            };
+            
+            Plotly.newPlot('mainPlot', traces, layout, {responsive: true});
+            
+            // Create comparison plot (bar chart of final values)
+            const finalValues = selectedSpecies.map(name => {
+                const values = species[name];
+                return values[values.length - 1];
+            });
+            
+            const comparisonTrace = {
+                x: selectedSpecies,
+                y: finalValues,
+                type: 'bar',
+                marker: {
+                    color: selectedSpecies.map((_, i) => colors[i % colors.length]),
+                    line: { color: '#333', width: 1 }
+                },
+                text: finalValues.map(v => v.toExponential(2)),
+                textposition: 'outside'
+            };
+            
+            const comparisonLayout = {
+                title: {
+                    text: 'Final Concentration Values',
+                    font: { size: 20, color: '#495057' }
+                },
+                xaxis: {
+                    title: 'Species',
+                    tickangle: -45
+                },
+                yaxis: {
+                    title: 'Final Concentration',
+                    type: 'log'
+                },
+                plot_bgcolor: 'white',
+                paper_bgcolor: 'white'
+            };
+            
+            Plotly.newPlot('comparisonPlot', [comparisonTrace], comparisonLayout, {responsive: true});
+        }
+        
+        function selectAll() {
+            const select = document.getElementById('speciesSelect');
+            Array.from(select.options).forEach(opt => opt.selected = true);
+            updatePlots();
+        }
+        
+        function deselectAll() {
+            const select = document.getElementById('speciesSelect');
+            Array.from(select.options).forEach(opt => opt.selected = false);
+        }
+        
+        // Load data on page load
+        loadData();
+    </script>
+</body>
+</html>
+

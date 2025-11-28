@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<sbml xmlns="http://www.sbml.org/sbml/level3/version2/core" level="3" version="2">
+  <model metaid="PBPK_BPA" id="PBPK_BPA">
+    <listOfCompartments>
+      <compartment id="comp1" size="3.6" spatialDimensions="3" constant="true"/>
+    </listOfCompartments>
+    <listOfSpecies>
+      <species id="Aplasma" compartment="comp1" initialConcentration="0" hasOnlySubstanceUnits="false" boundaryCondition="false" constant="false"/>
+    </listOfSpecies>
+    <listOfParameters>
+      <parameter id="Kabs" value="0.4" constant="true"/>
+      <parameter id="koa" constant="true"/>
+      <parameter id="t0" value="0" constant="true"/>
+      <parameter id="t1" constant="true"/>
+      <parameter id="Kelm" value="0.13" constant="true"/>
+      <parameter id="EoA_O" value="1" constant="true"/>
+      <parameter id="D_o" value="1.3381102" constant="true"/>
+      <parameter id="vplasma" value="3.6" constant="true"/>
+      <parameter id="period_O" value="0.0003" constant="true"/>
+      <parameter id="n_O" value="1" constant="true"/>
+      <parameter id="uptake_O" constant="true"/>
+    </listOfParameters>
+    <listOfInitialAssignments>
+      <initialAssignment symbol="koa">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <times/>
+            <cn type="e-notation"> 1.2 <sep/> 8 </cn>
+            <ci> EoA_O </ci>
+            <ci> D_o </ci>
+          </apply>
+        </math>
+      </initialAssignment>
+      <initialAssignment symbol="t1">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <plus/>
+            <ci> t0 </ci>
+            <ci> period_O </ci>
+          </apply>
+        </math>
+      </initialAssignment>
+      <initialAssignment symbol="uptake_O">
+        <math xmlns="http://www.w3.org/1998/Math/MathML">
+          <apply>
+            <divide/>
+            <apply>
+              <times/>
+              <ci> EoA_O </ci>
+              <ci> D_o </ci>
+            </apply>
+            <ci> n_O </ci>
+          </apply>
+        </math>
+      </initialAssignment>
+    </listOfInitialAssignments>
+    <listOfReactions>
+      <reaction id="J_absorption" reversible="true">
+        <listOfProducts>
+          <speciesReference species="Aplasma" stoichiometry="1" constant="true"/>
+        </listOfProducts>
+        <kineticLaw>
+          <math xmlns="http://www.w3.org/1998/Math/MathML">
+            <apply>
+              <minus/>
+              <apply>
+                <times/>
+                <ci> Kabs </ci>
+                <apply>
+                  <divide/>
+                  <apply>
+                    <times/>
+                    <ci> koa </ci>
+                    <apply>
+                      <minus/>
+                      <apply>
+                        <tanh/>
+                        <apply>
+                          <times/>
+                          <cn type="integer"> 100 </cn>
+                          <apply>
+                            <minus/>
+                            <csymbol encoding="text" definitionURL="http://www.sbml.org/sbml/symbols/time"> time </csymbol>
+                            <ci> t0 </ci>
+                          </apply>
+                        </apply>
+                      </apply>
+                      <apply>
+                        <tanh/>
+                        <apply>
+                          <times/>
+                          <cn type="integer"> 100 </cn>
+                          <apply>
+                            <minus/>
+                            <csymbol encoding="text" definitionURL="http://www.sbml.org/sbml/symbols/time"> time </csymbol>
+                            <ci> t1 </ci>
+                          </apply>
+                        </apply>
+                      </apply>
+                    </apply>
+                  </apply>
+                  <cn type="integer"> 2 </cn>
+                </apply>
+              </apply>
+              <apply>
+                <times/>
+                <ci> Kelm </ci>
+                <ci> Aplasma </ci>
+              </apply>
+            </apply>
+          </math>
+        </kineticLaw>
+      </reaction>
+    </listOfReactions>
+  </model>
+</sbml>
