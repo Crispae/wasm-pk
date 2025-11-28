@@ -232,3 +232,4 @@ class TestAssignmentRuleProcessor:
         assert len(result) == 1
 
 
+

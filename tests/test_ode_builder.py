@@ -170,3 +170,4 @@ class TestOdeSystemBuilder:
         with pytest.raises(KeyError):
             ode_builder.get_species_index("Unknown")
 
+
