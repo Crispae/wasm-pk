@@ -3,8 +3,8 @@
 
 import sympy
 from typing import Dict, List, Tuple, Any
-from ..core.base import ModelProcessor
-from ..parsers.expression_parser import SbmlExpressionParser
+from core.base import ModelProcessor
+from parsers.expression_parser import SbmlExpressionParser
 
 
 class OdeSystemBuilder(ModelProcessor):

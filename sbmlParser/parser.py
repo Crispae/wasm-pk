@@ -68,8 +68,9 @@ def ParseRule(ruleIndex, rule):
         newRule.Id = str(ruleIndex + 1)
 
     newRule.variable = rule.getVariable()
-    newRule.math = libsbml.formulaToString(rule.getMath())
-    ## We used here formulaTostring, istead of L3string, because dimenstions is not important for calulation
+    # Use MathML for better parsing with sbmlmath (improved operator precedence)
+    newRule.math = libsbml.writeMathMLToString(rule.getMath())
+    ## Using MathML instead of formulaToString for direct parsing with sbmlmath
 
     if rule.getVariable() == "":
         raise Exception("Algebraic rules are currently not supported")
@@ -151,7 +152,8 @@ def ParseReaction(reactionIndex, reaction):
     rateLawObject = reaction.getKineticLaw()
 
     if rateLawObject.getMath() != None:
-        newReaction.rateLaw = libsbml.formulaToString(rateLawObject.getMath())
+        # Use MathML for better parsing with sbmlmath (improved operator precedence)
+        newReaction.rateLaw = libsbml.writeMathMLToString(rateLawObject.getMath())
     #        outputFile.write(formulaToString(rateLaw.getMath()) + "\n")
     else:
         raise Exception("Rate law defined by plugin that is not currently supported")
@@ -207,38 +209,48 @@ def ParseCompartment(compartmentIndex, compartment):
 
 def ParseFunction(functionIndex, function):
     newFunction = dataclasses.FunctionData()
-    #    outputFile.write("Function; " + str(functionIndex + 1) + "\n")
 
     if function.isSetName():
         newFunction.name = function.getName()
     else:
         newFunction.name = ""
 
-    #    outputFile.write(function.getId() + ";" + functionName + "\n")
     newFunction.Id = function.getId()
-    newFunction.mathString = libsbml.formulaToString(function.getMath())
+    
+    # Get the number of arguments
     numArguments = function.getNumArguments()
-    funcStringIter = re.finditer(",", newFunction.mathString)
     newFunction.arguments = []
+    
+    # Extract argument names properly from the MathML
     for i in range(numArguments):
-        match = next(funcStringIter)
-        newFunction.arguments.append(libsbml.formulaToString(function.getArgument(i)))
-
-    newFunction.mathString = newFunction.mathString[match.end() + 1 : -1]
-
-    #    functionMath = formulaToString(function.getMath())
-    #    numArguments = function.getNumArguments()
-    #    funcStringIter = re.finditer(",", functionMath)
-    #    argumentString = ""
-    #    for i in range(numArguments):
-    #        match = next(funcStringIter)
-    #        argumentString += formulaToString(function.getArgument(i))
-    #        if i != numArguments-1:
-    #            argumentString += ";"
-    #    argumentString += "\n"
-    #    functionMath = functionMath[match.end()+1:-1]
-    #    outputFile.write(argumentString)
-    #    outputFile.write(functionMath + "\n")
+        arg = function.getArgument(i)
+        # Get the actual argument name from MathML
+        arg_name = libsbml.formulaToString(arg)
+        newFunction.arguments.append(arg_name)
+    
+    # Get the function body (the lambda's body expression)
+    # The math is: lambda(arg1, arg2, ..., body)
+    # We need to extract just the body
+    funcMath = function.getMath()
+    
+    # The body is the last child of the lambda
+    if funcMath and funcMath.getNumChildren() > 0:
+        # Get the body (last child after all bvars)
+        bodyMath = funcMath.getRightChild()  # or getChild(numArguments)
+        # Convert body to formula string
+        newFunction.mathString = libsbml.formulaToString(bodyMath)
+    else:
+        # Fallback to old method
+        fullFormula = libsbml.formulaToString(function.getMath())
+        # Try to extract body from lambda(args, body) format
+        funcStringIter = re.finditer(",", fullFormula)
+        match = None
+        for i in range(numArguments):
+            match = next(funcStringIter, None)
+        if match:
+            newFunction.mathString = fullFormula[match.end() + 1 : -1]
+        else:
+            newFunction.mathString = fullFormula
 
     return newFunction
 
@@ -252,9 +264,65 @@ def ParseInitialAssignment(assignmentIndex, assignment):
         newAssignment.Id = str(assignmentIndex + 1)
 
     newAssignment.variable = assignment.getSymbol()
-    newAssignment.math = libsbml.formulaToString(assignment.getMath())
+    # Use MathML for better parsing with sbmlmath (improved operator precedence)
+    newAssignment.math = libsbml.writeMathMLToString(assignment.getMath())
     newAssignment.name = assignment.getName()
     return newAssignment
+
+
+def ParseEvent(eventIndex, event):
+    """Parse an SBML event and its event assignments"""
+    newEvent = dataclasses.EventData()
+    
+    if event.isSetIdAttribute():
+        newEvent.Id = str(event.getIdAttribute())
+    else:
+        newEvent.Id = str(eventIndex + 1)
+    
+    if event.isSetName():
+        newEvent.name = event.getName()
+    else:
+        newEvent.name = ""
+    
+    # Parse trigger
+    if event.isSetTrigger():
+        trigger = event.getTrigger()
+        if trigger.getMath() != None:
+            newEvent.trigger = libsbml.writeMathMLToString(trigger.getMath())
+        else:
+            newEvent.trigger = None
+    else:
+        newEvent.trigger = None
+    
+    # Parse delay (optional)
+    if event.isSetDelay():
+        delay = event.getDelay()
+        if delay.getMath() != None:
+            newEvent.delay = libsbml.writeMathMLToString(delay.getMath())
+        else:
+            newEvent.delay = None
+    else:
+        newEvent.delay = None
+    
+    # Parse useValuesFromTriggerTime attribute
+    if event.isSetUseValuesFromTriggerTime():
+        newEvent.useValuesFromTriggerTime = event.getUseValuesFromTriggerTime()
+    else:
+        newEvent.useValuesFromTriggerTime = True
+    
+    # Parse event assignments
+    newEvent.eventAssignments = []
+    for i in range(event.getNumEventAssignments()):
+        assignment = event.getEventAssignment(i)
+        newAssignment = dataclasses.EventAssignmentData()
+        newAssignment.variable = assignment.getVariable()
+        if assignment.getMath() != None:
+            newAssignment.math = libsbml.writeMathMLToString(assignment.getMath())
+        else:
+            newAssignment.math = None
+        newEvent.eventAssignments.append(newAssignment)
+    
+    return newEvent
 
 
 def ParseSBMLFile(filePath):
@@ -332,6 +400,11 @@ def ParseSBMLFile(filePath):
     for i in range(model.getNumInitialAssignments()):
         newAssignment = ParseInitialAssignment(i, model.getInitialAssignment(i))
         modelData.initialAssignments[newAssignment.Id] = newAssignment
+
+    # Parse events
+    for i in range(model.getNumEvents()):
+        newEvent = ParseEvent(i, model.getEvent(i))
+        modelData.events[newEvent.Id] = newEvent
     # print(model.getNumSpecies())
 
     # Convert ModelData to dictionary format for JSON serialization
@@ -344,6 +417,7 @@ def ParseSBMLFile(filePath):
         "assignmentRules": {},
         "rateRules": {},
         "initialAssignments": {},
+        "events": {},
     }
 
     for key, component in modelData.parameters.items():
@@ -369,6 +443,9 @@ def ParseSBMLFile(filePath):
 
     for key, component in modelData.initialAssignments.items():
         modelDictionary["initialAssignments"][key] = component.ToDictionary()
+
+    for key, component in modelData.events.items():
+        modelDictionary["events"][key] = component.ToDictionary()
 
     return modelDictionary
 

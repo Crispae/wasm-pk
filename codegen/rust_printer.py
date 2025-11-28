@@ -4,7 +4,7 @@
 import re
 import sympy
 from sympy.printing.rust import RustCodePrinter
-from ..core.base import CodeGenerator
+from core.base import CodeGenerator
 
 
 class CustomRustCodePrinter(RustCodePrinter):
@@ -83,6 +83,52 @@ class CustomRustCodePrinter(RustCodePrinter):
 
         lines.append("}")
         return "\n".join(lines)
+
+    def _print_Mul(self, expr):
+        """Handle multiplication with proper parenthesization
+
+        This fixes the critical bug where Add/Sub expressions inside multiplication
+        don't get wrapped in parentheses, causing operator precedence issues.
+
+        Example:
+            SymPy: Kabs*koa*(tanh(...) - tanh(...))/2
+            Wrong: Kabs*koa*tanh(...) - tanh(...)/2
+            Right: Kabs*koa*(tanh(...) - tanh(...))/2
+
+        Args:
+            expr: SymPy Mul expression
+
+        Returns:
+            Rust code string for multiplication with correct precedence
+        """
+        from functools import reduce
+        import operator
+
+        # CRITICAL: Check which args are Add BEFORE float casting
+        # (float casting wraps them in TypeCast, hiding the Add)
+        needs_parens = set()
+        for i, arg in enumerate(expr.args):
+            if isinstance(arg, sympy.Add):
+                needs_parens.add(i)
+
+        # Handle float casting (from parent implementation)
+        contains_floats = any(arg.is_real and not arg.is_integer for arg in expr.args)
+        if contains_floats:
+            expr = reduce(operator.mul,
+                         (self._cast_to_float(arg) if arg != -1 else arg
+                          for arg in expr.args))
+
+        # Collect terms, wrapping Add expressions in parentheses
+        # Use the pre-casting check to determine which args need parens
+        terms = []
+        for i, arg in enumerate(expr.args):
+            if i in needs_parens or isinstance(arg, sympy.Add):
+                # Wrap Add/Sub expressions in parentheses to maintain correct precedence
+                terms.append(f"({self._print(arg)})")
+            else:
+                terms.append(self._print(arg))
+
+        return "*".join(terms)
 
     def _print_Integer(self, expr):
         """Always print integers as floats in our context

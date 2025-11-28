@@ -1,0 +1,13 @@
+# SBML to Rust Generator Dependencies
+
+
+
+# MathML parsing (recommended for better operator precedence)
+# Install from local submodule
+sbmlmath>=0.4.1
+
+# Alternative: Install from PyPI (once available)
+# sbmlmath>=0.2.0
+
+# Optional dependencies for testing
+# pytest>=7.0.0

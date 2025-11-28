@@ -3,7 +3,7 @@
 
 import sympy
 from typing import List, Tuple, Any
-from ..core.base import Optimizer
+from core.base import Optimizer
 
 
 class SymbolicOptimizer(Optimizer):
