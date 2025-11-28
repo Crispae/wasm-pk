@@ -18,15 +18,17 @@ pub struct SimulationResult {
 #[derive(Serialize, Deserialize)]
 pub struct SimulationParams {
     pub Kabs: f64,
+    pub koa: f64,
     pub t0: f64,
+    pub t1: f64,
     pub Kelm: f64,
     pub EoA_O: f64,
     pub D_o: f64,
     pub vplasma: f64,
     pub period_O: f64,
     pub n_O: f64,
+    pub uptake_O: f64,
     pub comp1: f64,
-
     pub final_time: Option<f64>,
 }
 
@@ -56,17 +58,19 @@ pub fn run_simulation(params: &str) -> String {
     };
 
     let Kabs = sim_params.Kabs;
+    let koa = sim_params.koa;
     let t0 = sim_params.t0;
+    let t1 = sim_params.t1;
     let Kelm = sim_params.Kelm;
     let EoA_O = sim_params.EoA_O;
     let D_o = sim_params.D_o;
     let vplasma = sim_params.vplasma;
     let period_O = sim_params.period_O;
     let n_O = sim_params.n_O;
+    let uptake_O = sim_params.uptake_O;
     let comp1 = sim_params.comp1;
-    let koa = 1.2e-8*EoA_O*D_o;
-    let t1 = period_O + t0;
-    let uptake_O = EoA_O*D_o*n_O.powi(-1);
+
+
 
 
     // RHS Closure
@@ -102,6 +106,7 @@ pub fn run_simulation(params: &str) -> String {
     let problem = OdeBuilder::<M>::new()
         .rhs_implicit(rhs, jac)
         .init(init, 1)
+        
         .build()
         .unwrap();
 
@@ -123,7 +128,6 @@ pub fn run_simulation(params: &str) -> String {
                 time.push(solver.state().t);
             },
             Ok(OdeSolverStopReason::TstopReached) => break,
-            Ok(OdeSolverStopReason::RootFound(_)) => break,
             Err(_) => panic!("Solver Error"),
         }
     }

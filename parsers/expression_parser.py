@@ -63,8 +63,10 @@ class SbmlExpressionParser(Parser):
         self.context["le"] = sympy.Le
         self.context["eq"] = sympy.Eq
         self.context["neq"] = sympy.Ne
-        self.context["and"] = sympy.And
-        self.context["or"] = sympy.Or
+        # Note: 'and' and 'or' are Python keywords, so we use 'And' and 'Or' in context
+        # The _transform_logical_keywords method converts 'and(...)' to 'And(...)'
+        self.context["And"] = sympy.And
+        self.context["Or"] = sympy.Or
 
         # Helper for transformed piecewise
         self.context["sbml_piecewise"] = self._create_piecewise_function()
@@ -253,7 +255,10 @@ class SbmlExpressionParser(Parser):
         # 3. Handle Piecewise formatting for SymPy
         expression = self._transform_piecewise(expression)
 
-        # 4. Parse with SymPy
+        # 4. Transform Python keywords (and, or) to SymPy functions (And, Or)
+        expression = self._transform_logical_keywords(expression)
+
+        # 5. Parse with SymPy
         # Enable implicit multiplication (e.g., "k1 A" -> "k1 * A")
         transformations = standard_transformations + (
             implicit_multiplication_application,
@@ -306,6 +311,54 @@ class SbmlExpressionParser(Parser):
         for unit in units:
             expr = re.sub(rf"\b{unit}\b", "", expr, flags=re.IGNORECASE)
 
+        # Clean up any dangling operators left after unit removal
+        # Examples: "x * " -> "x", " * second" -> "", "x * * y" -> "x * y"
+        expr = self._cleanup_dangling_operators(expr)
+
+        return expr
+
+    def _cleanup_dangling_operators(self, expr: str) -> str:
+        """Clean up dangling operators left after unit removal
+
+        Handles cases like:
+        - "x * " -> "x"
+        - " * second" -> ""
+        - "x * * y" -> "x * y" (spaced duplicates)
+        - "x + " -> "x"
+        - " / second" -> ""
+
+        Note: Protects ** (power operator) from being treated as duplicate * operators.
+
+        Args:
+            expr: Expression string potentially with dangling operators
+
+        Returns:
+            Cleaned expression string
+        """
+        # IMPORTANT: Protect power operator (**) from being treated as duplicate *
+        # Replace ** with a temporary placeholder that's unlikely to appear in real expressions
+        POWER_PLACEHOLDER = '__POWER_OP__'
+        expr = expr.replace('**', POWER_PLACEHOLDER)
+        
+        # Remove trailing operators (with optional whitespace)
+        expr = re.sub(r'\s*[\*\+\-\/]\s*$', '', expr)
+        
+        # Remove leading operators (with optional whitespace)
+        expr = re.sub(r'^\s*[\*\+\-\/]\s*', '', expr)
+        
+        # Remove duplicate operators with spaces (e.g., " * * " -> " * ")
+        expr = re.sub(r'\s*([\*\+\-\/])\s*\1\s*', r' \1 ', expr)
+        
+        # Remove operators with nothing on both sides (e.g., " * " in middle)
+        expr = re.sub(r'\s*[\*\+\-\/]\s*[\*\+\-\/]\s*', ' ', expr)
+        
+        # Restore power operator
+        expr = expr.replace(POWER_PLACEHOLDER, '**')
+        
+        # Clean up extra whitespace
+        expr = re.sub(r'\s+', ' ', expr)
+        expr = expr.strip()
+        
         return expr
 
     def _transform_piecewise(self, expr: str) -> str:
@@ -323,6 +376,30 @@ class SbmlExpressionParser(Parser):
         if "piecewise" not in expr:
             return expr
         return expr.replace("piecewise", "sbml_piecewise")
+
+    def _transform_logical_keywords(self, expr: str) -> str:
+        """Transform Python keywords (and, or) to SymPy function names (And, Or)
+
+        Python keywords like 'and' and 'or' cannot be used as function names in
+        SymPy's parse_expr. This function replaces them with their capitalized
+        versions which are valid function names.
+
+        Args:
+            expr: Expression string
+
+        Returns:
+            Transformed expression with 'and' -> 'And' and 'or' -> 'Or'
+        """
+        # Use word boundaries to match complete identifiers only
+        # This prevents replacing 'and' inside 'stand' or 'or' inside 'for'
+        import re
+        
+        # Replace 'and(' with 'And(' (function call)
+        expr = re.sub(r'\band\s*\(', 'And(', expr)
+        # Replace 'or(' with 'Or(' (function call)
+        expr = re.sub(r'\bor\s*\(', 'Or(', expr)
+        
+        return expr
 
     def _create_piecewise_function(self):
         """Create a function that converts SBML piecewise to SymPy Piecewise
