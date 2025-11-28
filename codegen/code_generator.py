@@ -3,7 +3,7 @@
 
 from typing import List, Tuple, Dict
 import sympy
-from .rust_printer import RustCodeGenerator
+from codegen.rust_printer import RustCodeGenerator
 
 
 class RustBlockGenerator:
@@ -133,7 +133,7 @@ class RustBlockGenerator:
         Returns:
             Rust code block initializing Vec::new() for each species
         """
-        from ..utils.validators import IdentifierValidator
+        from utils.validators import IdentifierValidator
 
         init_code = []
         for species_id in species_list:
@@ -156,7 +156,7 @@ class RustBlockGenerator:
         Returns:
             Rust code block with push statements
         """
-        from ..utils.validators import IdentifierValidator
+        from utils.validators import IdentifierValidator
 
         pushes = []
         for i, species_id in enumerate(species_list):
@@ -174,7 +174,7 @@ class RustBlockGenerator:
         Returns:
             Rust code block with HashMap insert statements
         """
-        from ..utils.validators import IdentifierValidator
+        from utils.validators import IdentifierValidator
 
         map_inserts = []
         for species_id in species_list:
@@ -184,3 +184,68 @@ class RustBlockGenerator:
             )
 
         return "\n".join(map_inserts)
+
+    def generate_initial_assignments(
+        self,
+        initial_assignments: Dict[str, any],
+        expression_parser
+    ) -> str:
+        """Generate code for initial assignments
+
+        Args:
+            initial_assignments: Dictionary of initial assignment data from SBML
+            expression_parser: Expression parser to convert MathML to SymPy
+
+        Returns:
+            Rust code block with initial assignment calculations
+        """
+        if not initial_assignments:
+            return ""
+
+        init_code = []
+        for assignment_id, assignment in initial_assignments.items():
+            variable = assignment.get("variable")
+            math_ml = assignment.get("math")
+
+            if not variable or not math_ml:
+                continue
+
+            # Parse MathML to SymPy expression
+            try:
+                expr = expression_parser.parse(math_ml)
+                # Generate Rust code from expression
+                rust_expr = self.code_gen.generate(expr)
+                init_code.append(f"    let {variable} = {rust_expr};")
+            except Exception as e:
+                print(f"Warning: Could not parse initial assignment for {variable}: {e}")
+                continue
+
+        return "\n".join(init_code)
+
+    def generate_assignment_rules(
+        self,
+        assignment_rules: List[Tuple[str, sympy.Expr]]
+    ) -> str:
+        """Generate code for assignment rule calculations
+
+        Args:
+            assignment_rules: List of (variable, expression) tuples in dependency order
+
+        Returns:
+            Rust code block with assignment calculations
+
+        Example:
+            Input: [("Fat", BM * scVFat), ("VBlood", BM * scVBlood)]
+            Output:
+                let Fat = BM * scVFat;
+                let VBlood = BM * scVBlood;
+        """
+        if not assignment_rules:
+            return ""
+
+        assignment_code = []
+        for variable, expr in assignment_rules:
+            rust_expr = self.code_gen.generate_code_with_formatting(expr)
+            assignment_code.append(f"    let {variable} = {rust_expr};")
+
+        return "\n".join(assignment_code)

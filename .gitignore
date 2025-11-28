@@ -16,7 +16,6 @@ venv/
 
 # Generated Output
 pkg/
-output/
 
 # OS
 .DS_Store

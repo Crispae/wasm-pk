@@ -50,171 +50,114 @@ class RustTemplateManager:
 
         Args:
             model_name: Name of the model
-            components: Dictionary with keys:
-                - species_fields: Struct fields for species
-                - param_fields: Struct fields for parameters
-                - param_extract: Parameter extraction code
-                - species_extract: Species extraction code
-                - temp_vars: Temporary variable declarations
-                - rhs_block: RHS derivative calculations
-                - jac_block: Jacobian calculations
-                - result_vectors_init: Result vector initialization
-                - initial_pushes: Initial state pushes
-                - loop_pushes: Loop state pushes
-                - map_inserts: HashMap insert statements
-                - n_species: Number of species
-                - gut_idx: Index of gut compartment species (default 5)
+            components: Dictionary with component code blocks
 
         Returns:
             Complete Rust source code
         """
-        template = f'''// Generated WASM-compatible Rust code from SBML model: {model_name}
-// Uses SymPy CSE for optimized derivatives and Jacobian
-
-use diffsol::{{OdeBuilder, OdeSolverMethod, OdeSolverStopReason, Vector}};
-use wasm_bindgen::prelude::*;
-use serde::{{Deserialize, Serialize}};
-use std::collections::HashMap;
-
-type M = diffsol::NalgebraMat<f64>;
-type LS = diffsol::NalgebraLU<f64>;
-
-#[derive(Serialize, Deserialize)]
-pub struct SimulationResult {{
-{components["species_fields"]}
-    pub time: Vec<f64>,
-}}
-
-#[derive(Serialize, Deserialize)]
-pub struct SimulationParams {{
-{components["param_fields"]}
-    pub doses: Vec<(f64, f64)>,
-    pub final_time: Option<f64>,
-}}
-
-#[wasm_bindgen]
-extern "C" {{
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(s: &str);
-}}
-
-macro_rules! console_log {{
-    ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))
-}}
-
-#[wasm_bindgen]
-pub fn run_simulation(params: &str) -> String {{
-    console_log!("Starting simulation...");
-
-    let sim_params: SimulationParams = match serde_json::from_str(params) {{
-        Ok(p) => p,
-        Err(e) => {{
-            console_log!("Error parsing params: {{}}", e);
-            return serde_json::to_string(&SimulationResult {{
-                species: HashMap::new(),
-                time: vec![],
-            }}).unwrap();
-        }}
-    }};
-
-{components["param_extract"]}
-    let doses = sim_params.doses;
-
-    // RHS Closure
-    let rhs = |y: &diffsol::NalgebraVec<f64>, _p: &diffsol::NalgebraVec<f64>, _t: f64, dy: &mut diffsol::NalgebraVec<f64>| {{
-        // Map species names to y indices
-{components["species_extract"]}
-
-        // Temporary variables (CSE)
-{components["temp_vars"]}
-
-        // Derivatives
-{components["rhs_block"]}
-    }};
-
-    // Jacobian Closure (Matrix-Vector Product)
-    let jac = |y: &diffsol::NalgebraVec<f64>, _p: &diffsol::NalgebraVec<f64>, _t: f64, v: &diffsol::NalgebraVec<f64>, jv: &mut diffsol::NalgebraVec<f64>| {{
-        for i in 0..jv.len() {{ jv[i] = 0.0; }}
-
-        // Map species names to y indices
-{components["species_extract"]}
-
-        // Temporary variables (CSE)
-{components["temp_vars"]}
-
-        // Jacobian-Vector Product
-{components["jac_block"]}
-    }};
-
-    let init = |_y0: &diffsol::NalgebraVec<f64>, _t: f64, y: &mut diffsol::NalgebraVec<f64>| {{
-        for i in 0..{components["n_species"]} {{ y[i] = 0.0; }}
-    }};
-
-    let problem = OdeBuilder::<M>::new()
-        .rhs_implicit(rhs, jac)
-        .init(init, {components["n_species"]})
-        .build()
-        .unwrap();
-
-    let mut solver = problem.bdf::<LS>().unwrap();
-    let mut time = Vec::new();
-
-    // Initialize result vectors
-{components["result_vectors_init"]}
-
-    // First Dose
-    if !doses.is_empty() {{
-        let gut_idx = {components["gut_idx"]};
-        solver.state_mut().y[gut_idx] = doses[0].1;
-    }}
-
-{components["initial_pushes"]}
-    time.push(0.0);
-
-    // Simulation Loop
-    for (t, dose) in doses.into_iter().skip(1) {{
-        solver.set_stop_time(t).unwrap();
-        loop {{
-            match solver.step() {{
-                Ok(OdeSolverStopReason::InternalTimestep) => {{
-{components["loop_pushes"]}
-                    time.push(solver.state().t);
-                }},
-                Ok(OdeSolverStopReason::TstopReached) => break,
-                Ok(OdeSolverStopReason::RootFound(_)) => break,
-                Err(_) => panic!("Solver Error"),
-            }}
-        }}
-        let gut_idx = {components["gut_idx"]};
-        solver.state_mut().y[gut_idx] += dose;
-    }}
-
-    let final_time = sim_params.final_time.unwrap_or(24.0);
-    solver.set_stop_time(final_time).unwrap();
-    loop {{
-        match solver.step() {{
-            Ok(OdeSolverStopReason::InternalTimestep) => {{
-{components["loop_pushes"]}
-                time.push(solver.state().t);
-            }},
-            Ok(OdeSolverStopReason::TstopReached) => break,
-            Ok(OdeSolverStopReason::RootFound(_)) => break,
-            Err(_) => panic!("Solver Error"),
-        }}
-    }}
-
-    let mut species_map = HashMap::new();
-{components["map_inserts"]}
-
-    let result = SimulationResult {{
-        time,
-        species: species_map,
-    }};
-
-    serde_json::to_string(&result).unwrap()
-}}
-'''
-        return template
+        # Build template string without f-string interpolation in the Rust code
+        template_parts = [
+            f"// Generated WASM-compatible Rust code from SBML model: {model_name}\n",
+            "// Uses SymPy CSE for optimized derivatives and Jacobian\n\n",
+            "use diffsol::{OdeBuilder, OdeSolverMethod, OdeSolverStopReason, Vector};\n",
+            "use wasm_bindgen::prelude::*;\n",
+            "use serde::{Deserialize, Serialize};\n",
+            "use std::collections::HashMap;\n\n",
+            "type M = diffsol::NalgebraMat<f64>;\n",
+            "type LS = diffsol::NalgebraLU<f64>;\n\n",
+            "#[derive(Serialize, Deserialize)]\n",
+           "pub struct SimulationResult {\n",
+            components["species_fields"], "\n",
+            "    pub time: Vec<f64>,\n",
+            "}\n\n",
+            "#[derive(Serialize, Deserialize)]\n",
+            "pub struct SimulationParams {\n",
+            components["param_fields"],
+            "    pub final_time: Option<f64>,\n",
+            "}\n\n",
+            "#[wasm_bindgen]\n",
+            'extern "C" {\n',
+            "    #[wasm_bindgen(js_namespace = console)]\n",
+            "    fn log(s: &str);\n",
+            "}\n\n",
+            "macro_rules! console_log {\n",
+            "    ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))\n",
+           "}\n\n",
+            "#[wasm_bindgen]\n",
+            "pub fn run_simulation(params: &str) -> String {\n",
+            '    console_log!("Starting simulation...");\n\n',
+            "    let sim_params: SimulationParams = match serde_json::from_str(params) {\n",
+            "        Ok(p) => p,\n",
+            "        Err(e) => {\n",
+            '            console_log!("Error parsing params: {}", e);\n',
+            "            return serde_json::to_string(&SimulationResult {\n",
+            "                species: HashMap::new(),\n",
+            "                time: vec![],\n",
+            "            }).unwrap();\n",
+            "        }\n",
+            "    };\n\n",
+            components["param_extract"], "\n",
+            components.get("assignment_rules", ""), "\n\n",
+            components.get("initial_assignments", ""), "\n\n",
+            components.get("root_fn", ""),
+            "    // RHS Closure\n",
+            "    let rhs = |y: &diffsol::NalgebraVec<f64>, _p: &diffsol::NalgebraVec<f64>, t: f64, dy: &mut diffsol::NalgebraVec<f64>| {\n",
+            "        // Map species names to y indices\n",
+            components["species_extract"], "\n\n",
+            "        // Temporary variables (CSE)\n",
+            components["temp_vars"], "\n\n",
+            "        // Derivatives\n",
+            components["rhs_block"], "\n",
+            "    };\n\n",
+            "    // Jacobian Closure (Matrix-Vector Product)\n",
+            "    let jac = |y: &diffsol::NalgebraVec<f64>, _p: &diffsol::NalgebraVec<f64>, t: f64, v: &diffsol::NalgebraVec<f64>, jv: &mut diffsol::NalgebraVec<f64>| {\n",
+            "        for i in 0..jv.len() { jv[i] = 0.0; }\n\n",
+            "        // Map species names to y indices\n",
+            components["species_extract"], "\n\n",
+            "        // Temporary variables (CSE)\n",
+            components["temp_vars"], "\n\n",
+            "        // Jacobian-Vector Product\n",
+            components["jac_block"], "\n",
+            "    };\n\n",
+            "    let init = |_y0: &diffsol::NalgebraVec<f64>, _t: f64, y: &mut diffsol::NalgebraVec<f64>| {\n",
+            f"        for i in 0..{components['n_species']} {{ y[i] = 0.0; }}\n",
+            "    };\n\n",
+            "    let problem = OdeBuilder::<M>::new()\n",
+            "        .rhs_implicit(rhs, jac)\n",
+            f"        .init(init, {components['n_species']})\n",
+            "        ", components.get("root_registration", ""), "\n",
+            "        .build()\n",
+            "        .unwrap();\n\n",
+            "    let mut solver = problem.bdf::<LS>().unwrap();\n",
+            "    let mut time = Vec::new();\n\n",
+            "    // Initialize result vectors\n",
+            components["result_vectors_init"], "\n\n",
+            components["initial_pushes"], "\n",
+            "    time.push(0.0);\n\n",
+            "    let final_time = sim_params.final_time.unwrap_or(24.0);\n",
+            "    solver.set_stop_time(final_time).unwrap();\n",
+            "    loop {\n",
+            "        match solver.step() {\n",
+            "            Ok(OdeSolverStopReason::InternalTimestep) => {\n",
+            components["loop_pushes"], "\n",
+            "                time.push(solver.state().t);\n",
+            "            },\n",
+            components.get("event_handling", ""),
+            "            Ok(OdeSolverStopReason::TstopReached) => break,\n",
+            '            Err(_) => panic!("Solver Error"),\n',
+            "        }\n",
+            "    }\n\n",
+            "    let mut species_map = HashMap::new();\n",
+            components["map_inserts"], "\n\n",
+            "    let result = SimulationResult {\n",
+            "        time,\n",
+            "        species: species_map,\n",
+            "    };\n\n",
+            "    serde_json::to_string(&result).unwrap()\n",
+            "}\n"
+        ]
+        
+        return "".join(template_parts)
 
     def create_minimal_template(self, model_name: str) -> str:
         """Create a minimal Rust template for testing

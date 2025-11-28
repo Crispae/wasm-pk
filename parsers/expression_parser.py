@@ -9,8 +9,16 @@ from sympy.parsing.sympy_parser import (
     standard_transformations,
     implicit_multiplication_application,
 )
-from ..core.base import Parser
-from .function_inliner import FunctionInliner
+from core.base import Parser
+from parsers.function_inliner import FunctionInliner
+
+# Try to import sbmlmath, fallback to formula string parsing if not available
+try:
+    from sbmlmath import SBMLMathMLParser
+    SBMLMATH_AVAILABLE = True
+except ImportError:
+    SBMLMATH_AVAILABLE = False
+    print("Warning: sbmlmath not installed. Using fallback formula string parsing.")
 
 
 class SbmlExpressionParser(Parser):
@@ -25,6 +33,14 @@ class SbmlExpressionParser(Parser):
         """
         self.context = context.copy()
         self.function_inliner = FunctionInliner(functions)
+        self.functions = functions  # Store for custom function expansion
+
+        # Initialize sbmlmath parser if available
+        if SBMLMATH_AVAILABLE:
+            self.mathml_parser = SBMLMathMLParser(evaluate=False)
+        else:
+            self.mathml_parser = None
+
         self._setup_context()
 
     def _setup_context(self):
@@ -56,8 +72,12 @@ class SbmlExpressionParser(Parser):
     def parse(self, expression: str) -> sympy.Expr:
         """Parse SBML expression to SymPy expression
 
+        Supports both MathML (preferred) and formula string formats.
+        If sbmlmath is available, MathML will be parsed directly for better
+        accuracy and operator precedence handling.
+
         Args:
-            expression: SBML mathematical expression string
+            expression: SBML mathematical expression (MathML or formula string)
 
         Returns:
             SymPy expression
@@ -69,27 +89,184 @@ class SbmlExpressionParser(Parser):
             return sympy.Float(0.0)
 
         try:
-            # 1. Clean Units
-            expression = self._remove_units(expression)
-
-            # 2. Inline Function Definitions
-            expression = self.function_inliner.inline(expression)
-
-            # 3. Handle Piecewise formatting for SymPy
-            expression = self._transform_piecewise(expression)
-
-            # 4. Parse with SymPy
-            # Enable implicit multiplication (e.g., "k1 A" -> "k1 * A")
-            transformations = standard_transformations + (
-                implicit_multiplication_application,
-            )
-
-            return parse_expr(
-                expression, local_dict=self.context, transformations=transformations
-            )
+            # Detect format and use appropriate parser
+            if self._is_mathml(expression):
+                return self._parse_mathml(expression)
+            else:
+                return self._parse_formula_string(expression)
         except Exception as e:
-            print(f"Error parsing expression: {expression}")
+            print(f"Error parsing expression: {expression[:100]}...")
             raise e
+
+    def _is_mathml(self, expression: str) -> bool:
+        """Check if expression is MathML format
+
+        Args:
+            expression: Expression string
+
+        Returns:
+            True if expression appears to be MathML
+        """
+        stripped = expression.strip()
+        return stripped.startswith(('<?xml', '<math', '<apply', '<ci', '<cn'))
+
+    def _parse_mathml(self, mathml: str) -> sympy.Expr:
+        """Parse MathML using sbmlmath (if available)
+
+        Args:
+            mathml: MathML expression string
+
+        Returns:
+            SymPy expression
+
+        Raises:
+            Exception: If sbmlmath not available or parsing fails
+        """
+        if not SBMLMATH_AVAILABLE or self.mathml_parser is None:
+            # Fallback: try to extract formula string and parse that
+            print("Warning: sbmlmath not available, cannot parse MathML directly")
+            raise Exception("sbmlmath required for MathML parsing")
+
+        # Parse with sbmlmath
+        expr = self.mathml_parser.parse_str(mathml)
+
+        # Replace SBML-specific symbols with our context symbols
+        expr = self._replace_sbml_symbols(expr)
+        
+        # Inline any custom SBML functions
+        expr = self._inline_custom_functions(expr)
+
+        return expr
+
+    def _replace_sbml_symbols(self, expr: sympy.Expr) -> sympy.Expr:
+        """Replace SBML-specific symbols (TimeSymbol, etc.) with standard symbols
+
+        Args:
+            expr: SymPy expression from sbmlmath
+
+        Returns:
+            SymPy expression with replaced symbols
+        """
+        # Replace TimeSymbol with 't'
+        time_symbols = [s for s in expr.atoms(sympy.Dummy)
+                       if hasattr(s, 'definition_url') and
+                       'time' in getattr(s, 'definition_url', '')]
+        for ts in time_symbols:
+            expr = expr.subs(ts, self.context.get('t', sympy.Symbol('t')))
+
+        # Replace avogadro constant if present
+        avogadro_symbols = [s for s in expr.atoms(sympy.Dummy)
+                           if hasattr(s, 'definition_url') and
+                           'avogadro' in getattr(s, 'definition_url', '')]
+        for av in avogadro_symbols:
+        #SBML L3V2 defines avogadro as 6.02214179e23
+            expr = expr.subs(av, sympy.Float(6.02214179e23))
+
+        return expr
+
+    def _inline_custom_functions(self, expr: sympy.Expr) -> sympy.Expr:
+        """Inline custom SBML functions that appear as undefined SymPy functions
+        
+        When sbmlmath parses MathML with custom functions, it creates SymPy 
+        Function objects (e.g., metab_MM). We need to replace these with their
+        actual mathematical definitions, including handling nested function calls.
+        
+        Args:
+            expr: SymPy expression potentially containing custom functions
+            
+        Returns:
+            Expression with custom functions inlined
+        """
+        max_iterations = 10  # Prevent infinite loops
+        iteration = 0
+        
+        while iteration < max_iterations:
+            # Find all undefined functions in the expression
+            undefined_funcs = [atom for atom in expr.atoms(sympy.Function) 
+                              if isinstance(atom, sympy.core.function.AppliedUndef)]
+            
+            if not undefined_funcs:
+                # No more undefined functions, we're done
+                break
+                
+            found_substitution = False
+            
+            # Replace each undefined function with its definition
+            for func_call in undefined_funcs:
+                func_name = func_call.func.__name__
+                
+                # Check if this is a custom SBML function we know about
+                if func_name in self.functions:
+                    func_def = self.functions[func_name]
+                    func_args = func_def['arguments']
+                    func_body = func_def['mathString']
+                    
+                    # Create context with function arguments to prevent implicit multiplication issues
+                    func_context = {arg: sympy.Symbol(arg) for arg in func_args}
+                    
+                    # Parse the function body as a formula string
+                    # This will recursively inline any nested functions
+                    try:
+                        body_expr = self._parse_formula_string(func_body, extra_context=func_context)
+                    except:
+                        # If formula parsing fails, continue
+                        continue
+                    
+                    # Create substitution mapping from formal params to actual args
+                    subs_dict = {}
+                    for i, arg_name in enumerate(func_args):
+                        if i < len(func_call.args):
+                            subs_dict[sympy.Symbol(arg_name)] = func_call.args[i]
+                    
+                    # Substitute arguments in the body
+                    expanded = body_expr.subs(subs_dict)
+                    
+                    # Replace the function call with the expanded expression
+                    expr = expr.subs(func_call, expanded)
+                    found_substitution = True
+                    break  # Start over to handle newly revealed nested functions
+            
+            if not found_substitution:
+                # No substitutions made, we're stuck
+                break
+                
+            iteration += 1
+        
+        return expr
+
+    def _parse_formula_string(self, expression: str, extra_context: dict = None) -> sympy.Expr:
+        """Parse formula string (old method - for backward compatibility)
+
+        Args:
+            expression: Formula string (e.g. "k1 * A")
+            extra_context: Optional dictionary of extra symbols to include in context
+
+        Returns:
+            SymPy expression
+        """
+        # 1. Clean Units
+        expression = self._remove_units(expression)
+
+        # 2. Inline Function Definitions
+        expression = self.function_inliner.inline(expression)
+
+        # 3. Handle Piecewise formatting for SymPy
+        expression = self._transform_piecewise(expression)
+
+        # 4. Parse with SymPy
+        # Enable implicit multiplication (e.g., "k1 A" -> "k1 * A")
+        transformations = standard_transformations + (
+            implicit_multiplication_application,
+        )
+
+        # Prepare context
+        context = self.context.copy()
+        if extra_context:
+            context.update(extra_context)
+
+        return parse_expr(
+            expression, local_dict=context, transformations=transformations
+        )
 
     def _remove_units(self, expr: str) -> str:
         """Remove unit annotations from expressions
