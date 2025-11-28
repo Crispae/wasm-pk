@@ -16,6 +16,7 @@ venv/
 
 # Generated Output
 pkg/
+runner/target/
 
 # OS
 .DS_Store

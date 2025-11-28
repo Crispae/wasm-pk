@@ -82,7 +82,7 @@ class SbmlModel:
                 id=species_id,
                 name=species_data.get("name", species_id),
                 compartment=species_data.get("compartment", "default"),
-                initial_amount=species_data.get("initialAmount", 0.0),
+                initial_amount=species_data.get("value", 0.0),  # Parser stores as "value"
                 boundary_condition=species_data.get("boundaryCondition", False),
                 has_only_substance_units=species_data.get("hasOnlySubstanceUnits", False)
             )

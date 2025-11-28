@@ -177,19 +177,23 @@ class SbmlExpressionParser(Parser):
         cleaned = re.sub(r"<\?xml[^>]*\?>", "", mathml, flags=re.IGNORECASE)
 
         # Find and remove sbml:units attributes from <cn> elements
-        # Pattern: <cn sbml:units="unit_name"> -> <cn>
-        # We capture the unit name for warning purposes
+        # But PRESERVE type="e-notation" and other type attributes needed for parsing!
+        # Pattern: <cn sbml:units="unit_name" type="..."> -> <cn type="...">
         def remove_units_attr(match):
             full_tag = match.group(0)
             # Extract unit name if present
             unit_match = re.search(r'sbml:units=["\']([^"\']+)["\']', full_tag)
             if unit_match:
                 removed_units.append(unit_match.group(1))
-            # Return tag without attributes
-            return "<cn>"
 
-        # Remove all attributes from <cn> elements (including sbml:units and type)
-        # This is safe because these are metadata attributes, not needed for parsing
+            # Preserve type attribute if present (needed for e-notation!)
+            type_match = re.search(r'type=["\']([^"\']+)["\']', full_tag)
+            if type_match:
+                return f'<cn type="{type_match.group(1)}">'
+            else:
+                return "<cn>"
+
+        # Remove sbml:units attributes from <cn> elements while preserving type
         cleaned = re.sub(r"<cn\s+[^>]*>", remove_units_attr, cleaned)
 
         # Clean up extra whitespace (but preserve structure)

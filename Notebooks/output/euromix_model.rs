@@ -1,8 +1,7 @@
-// Generated WASM-compatible Rust code from SBML model: euromix_model
+// Generated native Rust code from SBML model: euromix_model
 // Uses SymPy CSE for optimized derivatives and Jacobian
 
 use diffsol::{OdeBuilder, OdeSolverMethod, OdeSolverStopReason, Vector};
-use wasm_bindgen::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -51,27 +50,32 @@ pub struct SimulationParams {
     pub Air: f64,
     pub Urine: f64,
     pub Gut: f64,
+
+    // Initial amounts (optional, for runtime dosing)
+    pub init_QFat: Option<f64>,
+    pub init_QRich: Option<f64>,
+    pub init_QPoor: Option<f64>,
+    pub init_QLiver: Option<f64>,
+    pub init_QMetab: Option<f64>,
+    pub init_QGut: Option<f64>,
+    pub init_QSkin_u: Option<f64>,
+    pub init_QSkin_e: Option<f64>,
+    pub init_QSkin_sc_u: Option<f64>,
+    pub init_QSkin_sc_e: Option<f64>,
+    pub init_QArt: Option<f64>,
+    pub init_QVen: Option<f64>,
+    pub init_QExcret: Option<f64>,
+    pub init_QAir: Option<f64>,
     pub final_time: Option<f64>,
 }
 
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(s: &str);
-}
-
-macro_rules! console_log {
-    ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))
-}
-
-#[wasm_bindgen]
 pub fn run_simulation(params: &str) -> String {
-    console_log!("Starting simulation...");
+    println!("Starting simulation...");
 
     let sim_params: SimulationParams = match serde_json::from_str(params) {
         Ok(p) => p,
         Err(e) => {
-            console_log!("Error parsing params: {}", e);
+            eprintln!("Error parsing params: {}", e);
             return serde_json::to_string(&SimulationResult {
                 species: HashMap::new(),
                 time: vec![],
@@ -480,13 +484,24 @@ pub fn run_simulation(params: &str) -> String {
     };
 
     let init = |_y0: &diffsol::NalgebraVec<f64>, _t: f64, y: &mut diffsol::NalgebraVec<f64>| {
-        for i in 0..14 { y[i] = 0.0; }
+        y[0] = sim_params.init_QFat.unwrap_or(0.0);
+        y[1] = sim_params.init_QRich.unwrap_or(0.0);
+        y[2] = sim_params.init_QPoor.unwrap_or(0.0);
+        y[3] = sim_params.init_QLiver.unwrap_or(0.0);
+        y[4] = sim_params.init_QMetab.unwrap_or(0.0);
+        y[5] = sim_params.init_QGut.unwrap_or(1.0);
+        y[6] = sim_params.init_QSkin_u.unwrap_or(0.0);
+        y[7] = sim_params.init_QSkin_e.unwrap_or(0.0);
+        y[8] = sim_params.init_QSkin_sc_u.unwrap_or(0.0);
+        y[9] = sim_params.init_QSkin_sc_e.unwrap_or(0.0);
+        y[10] = sim_params.init_QArt.unwrap_or(0.0);
+        y[11] = sim_params.init_QVen.unwrap_or(0.0);
+        y[12] = sim_params.init_QExcret.unwrap_or(0.0);
+        y[13] = sim_params.init_QAir.unwrap_or(0.0);
     };
-
     let problem = OdeBuilder::<M>::new()
         .rhs_implicit(rhs, jac)
         .init(init, 14)
-        
         .build()
         .unwrap();
 
@@ -547,6 +562,7 @@ pub fn run_simulation(params: &str) -> String {
                 time.push(solver.state().t);
             },
             Ok(OdeSolverStopReason::TstopReached) => break,
+            Ok(OdeSolverStopReason::RootFound(_)) => break,
             Err(_) => panic!("Solver Error"),
         }
     }
@@ -573,4 +589,309 @@ pub fn run_simulation(params: &str) -> String {
     };
 
     serde_json::to_string(&result).unwrap()
+}
+
+pub fn get_model_metadata() -> String {
+    let metadata = serde_json::json!({
+        "model_id": "euromix_model",
+        "num_species": 14,
+        "num_parameters": 34,
+        "time_units": "HR",
+        "substance_units": "MilliMOL",
+        "volume_units": "L"
+    });
+    serde_json::to_string(&metadata).unwrap()
+}
+
+pub fn get_parameters_info() -> String {
+    let params = serde_json::json!([
+        {
+            "id": "BM",
+            "default_value": 70.0,
+            "required": true
+        },
+        {
+            "id": "BSA",
+            "default_value": 190.0,
+            "required": true
+        },
+        {
+            "id": "scVFat",
+            "default_value": 0.209,
+            "required": true
+        },
+        {
+            "id": "scVRich",
+            "default_value": 0.105,
+            "required": true
+        },
+        {
+            "id": "scVLiver",
+            "default_value": 0.024,
+            "required": true
+        },
+        {
+            "id": "scVBlood",
+            "default_value": 0.068,
+            "required": true
+        },
+        {
+            "id": "scVArt",
+            "default_value": 0.333333333333333,
+            "required": true
+        },
+        {
+            "id": "scFBlood",
+            "default_value": 4.8,
+            "required": true
+        },
+        {
+            "id": "scFFat",
+            "default_value": 0.085,
+            "required": true
+        },
+        {
+            "id": "scFPoor",
+            "default_value": 0.12,
+            "required": true
+        },
+        {
+            "id": "scFLiver",
+            "default_value": 0.27,
+            "required": true
+        },
+        {
+            "id": "scFSkin",
+            "default_value": 0.05,
+            "required": true
+        },
+        {
+            "id": "fSA_exposed",
+            "default_value": 0.1,
+            "required": true
+        },
+        {
+            "id": "Height_sc",
+            "default_value": 0.0001,
+            "required": true
+        },
+        {
+            "id": "Height_vs",
+            "default_value": 0.0122,
+            "required": true
+        },
+        {
+            "id": "Falv",
+            "default_value": 2220.0,
+            "required": true
+        },
+        {
+            "id": "PCFat",
+            "default_value": 2.53,
+            "required": true
+        },
+        {
+            "id": "PCLiver",
+            "default_value": 0.923,
+            "required": true
+        },
+        {
+            "id": "PCRich",
+            "default_value": 0.875,
+            "required": true
+        },
+        {
+            "id": "PCPoor",
+            "default_value": 0.647,
+            "required": true
+        },
+        {
+            "id": "PCSkin_sc",
+            "default_value": 0.889,
+            "required": true
+        },
+        {
+            "id": "PCSkin",
+            "default_value": 0.889,
+            "required": true
+        },
+        {
+            "id": "PCAir",
+            "default_value": 1e+99,
+            "required": true
+        },
+        {
+            "id": "kGut",
+            "default_value": 1.0,
+            "required": true
+        },
+        {
+            "id": "Kp_sc_vs",
+            "default_value": 0.01,
+            "required": true
+        },
+        {
+            "id": "Km",
+            "default_value": 0.0,
+            "required": true
+        },
+        {
+            "id": "Michaelis",
+            "default_value": 0.0,
+            "required": true
+        },
+        {
+            "id": "Vmax",
+            "default_value": 0.0,
+            "required": true
+        },
+        {
+            "id": "CLH",
+            "default_value": 132.0,
+            "required": true
+        },
+        {
+            "id": "Ke",
+            "default_value": 7.5,
+            "required": true
+        },
+        {
+            "id": "fub",
+            "default_value": 0.51,
+            "required": true
+        },
+        {
+            "id": "Air",
+            "default_value": 1.0,
+            "required": true
+        },
+        {
+            "id": "Urine",
+            "default_value": 1.0,
+            "required": true
+        },
+        {
+            "id": "Gut",
+            "default_value": 1.0,
+            "required": true
+        }
+    ]);
+    serde_json::to_string(&params).unwrap()
+}
+
+pub fn get_species_info() -> String {
+    let species = serde_json::json!([
+        {
+            "id": "QFat",
+            "initial_amount": 0.0,
+            "units": "MilliMOL"
+        },
+        {
+            "id": "QRich",
+            "initial_amount": 0.0,
+            "units": "MilliMOL"
+        },
+        {
+            "id": "QPoor",
+            "initial_amount": 0.0,
+            "units": "MilliMOL"
+        },
+        {
+            "id": "QLiver",
+            "initial_amount": 0.0,
+            "units": "MilliMOL"
+        },
+        {
+            "id": "QMetab",
+            "initial_amount": 0.0,
+            "units": "MilliMOL"
+        },
+        {
+            "id": "QGut",
+            "initial_amount": 1.0,
+            "units": "MilliMOL"
+        },
+        {
+            "id": "QSkin_u",
+            "initial_amount": 0.0,
+            "units": "MilliMOL"
+        },
+        {
+            "id": "QSkin_e",
+            "initial_amount": 0.0,
+            "units": "MilliMOL"
+        },
+        {
+            "id": "QSkin_sc_u",
+            "initial_amount": 0.0,
+            "units": "MilliMOL"
+        },
+        {
+            "id": "QSkin_sc_e",
+            "initial_amount": 0.0,
+            "units": "MilliMOL"
+        },
+        {
+            "id": "QArt",
+            "initial_amount": 0.0,
+            "units": "MilliMOL"
+        },
+        {
+            "id": "QVen",
+            "initial_amount": 0.0,
+            "units": "MilliMOL"
+        },
+        {
+            "id": "QExcret",
+            "initial_amount": 0.0,
+            "units": "MilliMOL"
+        },
+        {
+            "id": "QAir",
+            "initial_amount": 0.0,
+            "units": "MilliMOL"
+        }
+    ]);
+    serde_json::to_string(&species).unwrap()
+}
+
+pub fn get_default_parameters() -> String {
+    let defaults = serde_json::json!({
+        "BM": 70.0,
+        "BSA": 190.0,
+        "scVFat": 0.209,
+        "scVRich": 0.105,
+        "scVLiver": 0.024,
+        "scVBlood": 0.068,
+        "scVArt": 0.333333333333333,
+        "scFBlood": 4.8,
+        "scFFat": 0.085,
+        "scFPoor": 0.12,
+        "scFLiver": 0.27,
+        "scFSkin": 0.05,
+        "fSA_exposed": 0.1,
+        "Height_sc": 0.0001,
+        "Height_vs": 0.0122,
+        "Falv": 2220.0,
+        "PCFat": 2.53,
+        "PCLiver": 0.923,
+        "PCRich": 0.875,
+        "PCPoor": 0.647,
+        "PCSkin_sc": 0.889,
+        "PCSkin": 0.889,
+        "PCAir": 1e+99,
+        "kGut": 1.0,
+        "Kp_sc_vs": 0.01,
+        "Km": 0.0,
+        "Michaelis": 0.0,
+        "Vmax": 0.0,
+        "CLH": 132.0,
+        "Ke": 7.5,
+        "fub": 0.51,
+        "Air": 1.0,
+        "Urine": 1.0,
+        "Gut": 1.0,
+        "final_time": 24.0
+    });
+    serde_json::to_string(&defaults).unwrap()
 }

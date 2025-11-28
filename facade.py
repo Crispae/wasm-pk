@@ -39,14 +39,10 @@ class SbmlToRustConverter:
         self.model = SbmlModel.from_dict(model_data)
 
         # Create mappings
-        self.species_map = {
-            s_id: i for i, s_id in enumerate(self.model.species.keys())
-        }
+        self.species_map = {s_id: i for i, s_id in enumerate(self.model.species.keys())}
         self.species_list = list(self.model.species.keys())
 
-        self.params_map = {
-            p_id: p.value for p_id, p in self.model.parameters.items()
-        }
+        self.params_map = {p_id: p.value for p_id, p in self.model.parameters.items()}
 
         self.compartments_map = {
             c_id: c.size for c_id, c in self.model.compartments.items()
@@ -72,10 +68,7 @@ class SbmlToRustConverter:
 
         # Get functions as dict
         functions_dict = {
-            f_id: {
-                "arguments": f.arguments,
-                "mathString": f.math_string
-            }
+            f_id: {"arguments": f.arguments, "mathString": f.math_string}
             for f_id, f in self.model.functions.items()
         }
 
@@ -86,14 +79,17 @@ class SbmlToRustConverter:
         self.jacobian_builder = JacobianBuilder(self.sym_species, self.species_list)
         self.optimizer = SymbolicOptimizer(optimization_level=2)
         self.code_generator = RustBlockGenerator()
-        self.event_generator = EventCodeGenerator(self.code_generator, self.expression_parser)
+        self.event_generator = EventCodeGenerator(
+            self.code_generator, self.expression_parser
+        )
         self.template_manager = RustTemplateManager()
 
-    def convert(self, model_name: str = "sbml_model") -> str:
+    def convert(self, model_name: str = "sbml_model", wasm: bool = True) -> str:
         """Main conversion method
 
         Args:
             model_name: Name for the generated Rust module
+            wasm: If True, generate WASM-compatible code (browser). If False, generate native Rust code.
 
         Returns:
             Complete Rust source code as string
@@ -102,7 +98,7 @@ class SbmlToRustConverter:
         print("Processing assignment rules...")
         assignment_rules = self.assignment_processor.process(self.model_data)
         print(f"Found {len(assignment_rules)} assignment rules")
-        
+
         # 2. Build ODE system
         print("Building ODE system...")
         ode_system = self.ode_builder.build_ode_system(self.model_data["reactions"])
@@ -119,19 +115,16 @@ class SbmlToRustConverter:
 
         # 5. Generate code blocks
         code_blocks = self._generate_code_blocks(
-            replacements, reduced_ode, reduced_jac, jac_indices, assignment_rules
+            replacements, reduced_ode, reduced_jac, jac_indices, assignment_rules, model_name, wasm
         )
 
         # 6. Assemble final Rust file
-        return self.template_manager.assemble_rust_file(model_name, code_blocks)
+        return self.template_manager.assemble_rust_file(
+            model_name, code_blocks, wasm=wasm
+        )
 
     def _generate_code_blocks(
-        self,
-        replacements,
-        reduced_ode,
-        reduced_jac,
-        jac_indices,
-        assignment_rules
+        self, replacements, reduced_ode, reduced_jac, jac_indices, assignment_rules, model_name, wasm
     ) -> Dict[str, str]:
         """Generate all code blocks needed for the template
 
@@ -147,14 +140,29 @@ class SbmlToRustConverter:
         """
         # Get set of assigned variables to exclude from struct
         assigned_vars = {var for var, _ in assignment_rules}
-        
+
+        # Also exclude variables with initial assignments
+        initial_assignments = self.model_data.get("initialAssignments", {})
+        initial_assigned_vars = {ia.get("variable") for ia in initial_assignments.values() if ia.get("variable")}
+        all_assigned_vars = assigned_vars | initial_assigned_vars
+
         # Filter params and compartments to exclude assigned variables
-        filtered_params = {k: v for k, v in self.params_map.items() if k not in assigned_vars}
-        filtered_compartments = {k: v for k, v in self.compartments_map.items() if k not in assigned_vars}
-        
-        # Generate struct fields
+        filtered_params = {
+            k: v for k, v in self.params_map.items() if k not in all_assigned_vars
+        }
+        filtered_compartments = {
+            k: v for k, v in self.compartments_map.items() if k not in all_assigned_vars
+        }
+
+        # Extract species initial amounts from model
+        species_initial_amounts = {
+            s_id: species.initial_amount
+            for s_id, species in self.model.species.items()
+        }
+
+        # Generate struct fields (with initial amount options)
         species_fields, param_fields = self.template_manager.generate_struct_fields(
-            self.species_list, filtered_params, filtered_compartments
+            self.species_list, filtered_params, filtered_compartments, species_initial_amounts
         )
 
         # Generate code blocks
@@ -167,12 +175,20 @@ class SbmlToRustConverter:
             "assignment_rules": self.code_generator.generate_assignment_rules(
                 assignment_rules
             ),
+            "initial_assignments": self.code_generator.generate_initial_assignments(
+                initial_assignments, self.expression_parser
+            ),
             "species_extract": self.code_generator.generate_species_extraction(
                 self.species_map
             ),
             "temp_vars": self.code_generator.generate_temp_vars(replacements),
             "rhs_block": self.code_generator.generate_derivatives(reduced_ode),
-            "jac_block": self.code_generator.generate_jacobian(reduced_jac, jac_indices),
+            "jac_block": self.code_generator.generate_jacobian(
+                reduced_jac, jac_indices
+            ),
+            "init_block": self.code_generator.generate_init_function(
+                self.species_list, self.species_map, species_initial_amounts
+            ),
             "result_vectors_init": self.code_generator.generate_result_vectors_init(
                 self.species_list
             ),
@@ -188,14 +204,26 @@ class SbmlToRustConverter:
             "n_species": len(self.species_list),
             "gut_idx": self.species_map.get("QGut", 5),  # Default to 5 if not found
         }
-        
+
+        # Add metadata functions for UI/tools
+        code_blocks["metadata_functions"] = self.code_generator.generate_metadata_functions(
+            model_name,
+            self.species_list,
+            species_initial_amounts,
+            filtered_params,
+            filtered_compartments,
+            wasm
+        )
+
         # Add event handling if events exist
         events = self.model_data.get("events", {})
         if events:
             print(f"Generating event handling for {len(events)} events...")
-            event_components = self.event_generator.generate_event_handling(events, self.species_map)
+            event_components = self.event_generator.generate_event_handling(
+                events, self.species_map
+            )
             code_blocks.update(event_components)
-        
+
         return code_blocks
 
     def get_model_info(self) -> Dict[str, Any]:
