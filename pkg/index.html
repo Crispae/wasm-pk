@@ -1,0 +1,1465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SBML Model Simulator</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #1a365d;
+            --primary-light: #2c5282;
+            --secondary: #718096;
+            --border: #e2e8f0;
+            --bg-light: #f8fafc;
+            --text-dark: #1a202c;
+            --text-muted: #64748b;
+            --success: #065f46;
+            --success-bg: #ecfdf5;
+            --warning: #92400e;
+            --warning-bg: #fffbeb;
+            --error: #991b1b;
+            --error-bg: #fef2f2;
+        }
+
+        body {
+            font-family: 'Times New Roman', Georgia, serif;
+            background-color: #ffffff;
+            color: var(--text-dark);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 30px 20px;
+            flex: 1;
+        }
+
+        /* Header - Academic Style */
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid var(--primary);
+        }
+
+        .header h1 {
+            font-size: 1.6rem;
+            font-weight: normal;
+            color: var(--primary);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .header .subtitle {
+            font-size: 0.95rem;
+            color: var(--secondary);
+            font-style: italic;
+        }
+
+        .header .model-id {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 6px;
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Status Bar */
+        .status {
+            padding: 8px 14px;
+            margin-bottom: 20px;
+            font-size: 0.85rem;
+            border-left: 4px solid;
+            background-color: var(--bg-light);
+        }
+
+        .status.loading {
+            border-color: var(--warning);
+            background-color: var(--warning-bg);
+            color: var(--warning);
+        }
+
+        .status.success {
+            border-color: var(--success);
+            background-color: var(--success-bg);
+            color: var(--success);
+        }
+
+        .status.error {
+            border-color: var(--error);
+            background-color: var(--error-bg);
+            color: var(--error);
+        }
+
+        /* Main Layout - Fixed Height */
+        .main-grid {
+            display: grid;
+            grid-template-columns: 360px 1fr;
+            gap: 30px;
+            align-items: start;
+            height: calc(100vh - 280px);
+            min-height: 500px;
+        }
+
+        /* Panel Styling */
+        .panel {
+            background: #ffffff;
+            border: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .panel-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            background-color: var(--bg-light);
+            flex-shrink: 0;
+        }
+
+        .panel-title {
+            font-size: 1rem;
+            font-weight: bold;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 0;
+        }
+
+        .panel-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0;
+        }
+
+        .panel-body-padded {
+            padding: 16px 20px;
+        }
+
+        .panel-footer {
+            padding: 16px 20px;
+            border-top: 1px solid var(--border);
+            background-color: var(--bg-light);
+            flex-shrink: 0;
+        }
+
+        /* Custom Scrollbar */
+        .panel-body::-webkit-scrollbar,
+        .results-section::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .panel-body::-webkit-scrollbar-track,
+        .results-section::-webkit-scrollbar-track {
+            background: var(--bg-light);
+        }
+
+        .panel-body::-webkit-scrollbar-thumb,
+        .results-section::-webkit-scrollbar-thumb {
+            background: var(--border);
+        }
+
+        .panel-body::-webkit-scrollbar-thumb:hover,
+        .results-section::-webkit-scrollbar-thumb:hover {
+            background: var(--secondary);
+        }
+
+        /* Collapsible Parameter Sections */
+        .param-section {
+            border-bottom: 1px solid var(--border);
+        }
+
+        .param-section:last-child {
+            border-bottom: none;
+        }
+
+        .param-section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 20px;
+            cursor: pointer;
+            background-color: #ffffff;
+            transition: background-color 0.2s;
+            user-select: none;
+        }
+
+        .param-section-header:hover {
+            background-color: var(--bg-light);
+        }
+
+        .param-section-title {
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 0;
+        }
+
+        .param-section-header .toggle-icon {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            transition: transform 0.2s;
+        }
+
+        .param-section.open .param-section-header .toggle-icon {
+            transform: rotate(180deg);
+        }
+
+        .param-section-content {
+            display: none;
+            padding: 0 20px 16px 20px;
+            background-color: var(--bg-light);
+        }
+
+        .param-section.open .param-section-content {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 10px;
+            display: grid;
+            grid-template-columns: 1fr 100px;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .form-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .form-group label {
+            font-size: 0.8rem;
+            color: var(--text-dark);
+            line-height: 1.3;
+        }
+
+        .form-group label .unit {
+            color: var(--text-muted);
+            font-style: italic;
+            font-size: 0.75rem;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 6px 8px;
+            border: 1px solid var(--border);
+            font-size: 0.85rem;
+            font-family: 'Courier New', monospace;
+            text-align: right;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        /* Model Info Section */
+        .model-info-section {
+            border-top: 1px solid var(--border);
+        }
+
+        .model-info-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 20px;
+            cursor: pointer;
+            background-color: #ffffff;
+            transition: background-color 0.2s;
+            user-select: none;
+        }
+
+        .model-info-header:hover {
+            background-color: var(--bg-light);
+        }
+
+        .model-info-header span {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .model-info-content {
+            display: none;
+            padding: 0 20px 16px 20px;
+            background-color: var(--bg-light);
+        }
+
+        .model-info-content.open {
+            display: block;
+        }
+
+        .model-info-table {
+            width: 100%;
+            font-size: 0.8rem;
+        }
+
+        .model-info-table tr {
+            border-bottom: 1px solid var(--border);
+        }
+
+        .model-info-table tr:last-child {
+            border-bottom: none;
+        }
+
+        .model-info-table th,
+        .model-info-table td {
+            padding: 6px 0;
+            text-align: left;
+        }
+
+        .model-info-table th {
+            font-weight: normal;
+            color: var(--text-muted);
+            width: 45%;
+        }
+
+        .model-info-table td {
+            font-family: 'Courier New', monospace;
+        }
+
+        /* Buttons */
+        .button-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            flex: 1;
+            padding: 10px 14px;
+            font-size: 0.85rem;
+            font-family: inherit;
+            border: 1px solid var(--primary);
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        button.primary {
+            background-color: var(--primary);
+            color: white;
+        }
+
+        button.primary:hover:not(:disabled) {
+            background-color: var(--primary-light);
+        }
+
+        button.secondary {
+            background-color: white;
+            color: var(--primary);
+        }
+
+        button.secondary:hover:not(:disabled) {
+            background-color: var(--bg-light);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Results Panel Layout */
+        .results-panel .panel-body {
+            display: flex;
+            flex-direction: column;
+            padding: 0;
+        }
+
+        /* Chart Container */
+        .chart-section {
+            flex: 1;
+            min-height: 250px;
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .chart-container {
+            position: relative;
+            height: 100%;
+            width: 100%;
+        }
+
+        /* Interactive Species Legend */
+        .species-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 12px 16px;
+            background-color: var(--bg-light);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .species-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.8rem;
+            padding: 4px 10px;
+            border: 1px solid var(--border);
+            background-color: #ffffff;
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .species-legend-item:hover {
+            border-color: var(--primary);
+        }
+
+        .species-legend-item.hidden {
+            opacity: 0.4;
+            background-color: var(--bg-light);
+        }
+
+        .species-legend-item .color-indicator {
+            width: 16px;
+            height: 3px;
+            transition: opacity 0.2s;
+        }
+
+        .species-legend-item.hidden .color-indicator {
+            opacity: 0.3;
+        }
+
+        .legend-hint {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-style: italic;
+            margin-left: auto;
+            padding-left: 12px;
+        }
+
+        /* Simulation Summary */
+        .simulation-summary {
+            display: flex;
+            justify-content: space-around;
+            padding: 10px 16px;
+            background-color: var(--bg-light);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .summary-item {
+            text-align: center;
+        }
+
+        .summary-item .label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .summary-item .value {
+            font-size: 1rem;
+            font-family: 'Courier New', monospace;
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        .summary-item .unit {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* Collapsible Results Section */
+        .results-section {
+            flex-shrink: 0;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .collapsible-item {
+            border-bottom: 1px solid var(--border);
+        }
+
+        .collapsible-item:last-child {
+            border-bottom: none;
+        }
+
+        .collapsible-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 16px;
+            cursor: pointer;
+            background-color: #ffffff;
+            transition: background-color 0.2s;
+            user-select: none;
+        }
+
+        .collapsible-header:hover {
+            background-color: var(--bg-light);
+        }
+
+        .collapsible-header .title {
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: var(--text-dark);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .collapsible-header .title .icon {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        .collapsible-header .value {
+            font-size: 0.85rem;
+            font-family: 'Courier New', monospace;
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        .collapsible-header .toggle-icon {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            transition: transform 0.2s;
+        }
+
+        .collapsible-item.open .toggle-icon {
+            transform: rotate(180deg);
+        }
+
+        .collapsible-content {
+            display: none;
+            padding: 0 16px 12px 16px;
+            background-color: var(--bg-light);
+        }
+
+        .collapsible-item.open .collapsible-content {
+            display: block;
+        }
+
+        .result-details {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+
+        .detail-item {
+            text-align: center;
+            padding: 6px;
+            background-color: #ffffff;
+            border: 1px solid var(--border);
+        }
+
+        .detail-item .label {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 2px;
+        }
+
+        .detail-item .value {
+            font-size: 0.8rem;
+            font-family: 'Courier New', monospace;
+            color: var(--text-dark);
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* No Results Placeholder */
+        .no-results {
+            text-align: center;
+            padding: 30px 20px;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        /* Footer */
+        .footer {
+            background-color: var(--primary);
+            color: white;
+            padding: 20px;
+            margin-top: 30px;
+        }
+
+        .footer-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .footer-left {
+            flex: 1;
+            min-width: 300px;
+        }
+
+        .footer-title {
+            font-size: 0.9rem;
+            font-weight: bold;
+            margin-bottom: 4px;
+            letter-spacing: 1px;
+        }
+
+        .footer-subtitle {
+            font-size: 0.8rem;
+            opacity: 0.85;
+            font-style: italic;
+        }
+
+        .footer-right {
+            text-align: right;
+        }
+
+        .footer-institution {
+            font-size: 0.85rem;
+            margin-bottom: 4px;
+        }
+
+        .footer-links {
+            font-size: 0.75rem;
+            opacity: 0.8;
+        }
+
+        .footer-links a {
+            color: white;
+            text-decoration: none;
+            margin-left: 12px;
+        }
+
+        .footer-links a:hover {
+            text-decoration: underline;
+        }
+
+        .footer-divider {
+            width: 100%;
+            border-top: 1px solid rgba(255,255,255,0.2);
+            margin: 12px 0;
+        }
+
+        .footer-copyright {
+            width: 100%;
+            text-align: center;
+            font-size: 0.7rem;
+            opacity: 0.7;
+        }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+
+            .panel {
+                height: auto;
+                max-height: none;
+            }
+
+            .panel-body {
+                max-height: 400px;
+            }
+
+            .chart-section {
+                min-height: 300px;
+            }
+
+            .form-group {
+                grid-template-columns: 1fr 90px;
+            }
+
+            .result-details {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .footer-content {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .footer-right {
+                text-align: center;
+            }
+
+            .footer-links a:first-child {
+                margin-left: 0;
+            }
+        }
+
+        /* Print Styles */
+        @media print {
+            .button-group, .status, .panel-footer, .footer {
+                display: none;
+            }
+
+            .main-grid {
+                height: auto;
+            }
+
+            .panel-body {
+                overflow: visible;
+                max-height: none;
+            }
+
+            .param-section-content,
+            .collapsible-content {
+                display: block !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 id="modelTitle">SBML Model Simulator</h1>
+            <p class="subtitle" id="modelSubtitle">Loading model information...</p>
+            <p class="model-id" id="modelId"></p>
+        </div>
+
+        <div id="status" class="status loading">
+            <span class="spinner"></span>
+            Initializing WASM module...
+        </div>
+
+        <div class="main-grid">
+            <!-- Parameters Panel -->
+            <div class="panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">Model Parameters</h2>
+                </div>
+                
+                <div class="panel-body">
+                    <form id="paramForm">
+                        <div id="parameterSections">
+                            <!-- Dynamically generated collapsible parameter sections -->
+                        </div>
+                    </form>
+
+                    <!-- Model Info Section -->
+                    <div class="model-info-section" id="modelInfoSection" style="display: none;">
+                        <div class="model-info-header" id="modelInfoToggle">
+                            <span>Model Information</span>
+                            <span class="toggle-icon">▼</span>
+                        </div>
+                        <div class="model-info-content" id="modelInfoContent">
+                            <table class="model-info-table" id="modelInfoTable"></table>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel-footer">
+                    <div class="button-group">
+                        <button type="button" class="secondary" id="btnReset">Reset</button>
+                        <button type="submit" class="primary" id="btnSimulate" form="paramForm" disabled>Simulate</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Panel -->
+            <div class="panel results-panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">Simulation Results</h2>
+                </div>
+
+                <div class="panel-body">
+                    <!-- Simulation Summary -->
+                    <div class="simulation-summary" id="simulationSummary" style="display: none;">
+                        <div class="summary-item">
+                            <div class="label">Data Points</div>
+                            <div class="value" id="summaryPoints">—</div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="label">Duration</div>
+                            <div class="value" id="summaryDuration">—</div>
+                            <div class="unit" id="summaryDurationUnit"></div>
+                        </div>
+                        <div class="summary-item">
+                            <div class="label">Species</div>
+                            <div class="value" id="summarySpecies">—</div>
+                        </div>
+                    </div>
+
+                    <!-- Chart -->
+                    <div class="chart-section">
+                        <div class="chart-container">
+                            <canvas id="resultsChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Legend -->
+                    <div class="species-legend" id="speciesLegend" style="display: none;">
+                        <span class="legend-hint">Click to toggle visibility</span>
+                    </div>
+
+                    <!-- Collapsible Results -->
+                    <div class="results-section" id="resultsSection">
+                        <div class="no-results" id="noResults">
+                            Run simulation to view results
+                        </div>
+                        <div id="collapsibleResults"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-left">
+                <div class="footer-title" id="footerProjectName">SBML WASM Simulator</div>
+                <div class="footer-subtitle">Systems Biology Markup Language Model Simulation Platform</div>
+            </div>
+            <div class="footer-right">
+                <div class="footer-institution" id="footerInstitution">
+                    InsilicoVida Research Group
+                </div>
+                <div class="footer-links">
+                    <a href="#" id="footerDocsLink">Documentation</a>
+                    <a href="https://github.com/Crispae/wasm-pk" id="footerRepoLink">Repository</a>
+                    <a href="#" id="footerContactLink">Contact</a>
+                </div>
+            </div>
+            <div class="footer-divider"></div>
+            <div class="footer-copyright" id="footerCopyright">
+                © <span id="footerYear"></span> All rights reserved. 
+                Built with Rust and WebAssembly for high-performance browser-based simulation.
+            </div>
+        </div>
+    </footer>
+
+    <script type="module">
+        import init, {
+            run_simulation,
+            get_model_metadata,
+            get_species_info,
+            get_parameters_info,
+            get_default_parameters
+        } from './sbml_model.js';
+
+        // State
+        let modelMetadata = null;
+        let parametersInfo = [];
+        let speciesInfo = [];
+        let defaultParams = {};
+        let chart = null;
+        let chartDatasets = [];
+        let visibilityState = {};
+
+        // DOM Elements
+        const statusDiv = document.getElementById('status');
+        const paramForm = document.getElementById('paramForm');
+        const btnSimulate = document.getElementById('btnSimulate');
+        const btnReset = document.getElementById('btnReset');
+
+        // Color palette for species (academic, muted colors)
+        const speciesColors = [
+            '#1a365d', // Navy
+            '#744210', // Brown
+            '#22543d', // Forest
+            '#702459', // Plum
+            '#1e3a5f', // Steel Blue
+            '#4a5568', // Gray
+            '#8b5a2b', // Sienna
+            '#285e61', // Teal
+        ];
+
+        // ============ Utility Functions ============
+
+        function updateStatus(message, type, showSpinner = false) {
+            statusDiv.innerHTML = showSpinner 
+                ? `<span class="spinner"></span>${message}`
+                : message;
+            statusDiv.className = `status ${type}`;
+        }
+
+        function formatValue(value, decimals = 4) {
+            if (value === null || value === undefined) return '—';
+            if (Math.abs(value) < 0.0001 || Math.abs(value) > 10000) {
+                return value.toExponential(decimals);
+            }
+            return value.toFixed(decimals);
+        }
+
+        // ============ Footer Setup ============
+
+        function setupFooter() {
+            document.getElementById('footerYear').textContent = new Date().getFullYear();
+            
+            // Update footer with model info if available
+            if (modelMetadata) {
+                if (modelMetadata.model_name) {
+                    document.getElementById('footerProjectName').textContent = modelMetadata.model_name;
+                }
+            }
+        }
+
+        // ============ Model Loading Functions ============
+
+        function loadModelMetadata() {
+            try {
+                const metadataJson = get_model_metadata();
+                modelMetadata = JSON.parse(metadataJson);
+
+                document.getElementById('modelTitle').textContent = 
+                    modelMetadata.model_name || modelMetadata.model_id || 'SBML Model Simulator';
+                
+                document.getElementById('modelSubtitle').textContent = 
+                    modelMetadata.description || 'Interactive pharmacokinetic simulation';
+                
+                if (modelMetadata.model_id) {
+                    document.getElementById('modelId').textContent = `Model ID: ${modelMetadata.model_id}`;
+                }
+
+                document.title = modelMetadata.model_name || modelMetadata.model_id || 'SBML Simulator';
+
+                // Populate model info table
+                const infoTable = document.getElementById('modelInfoTable');
+                infoTable.innerHTML = `
+                    <tr><th>Species</th><td>${modelMetadata.num_species || '—'}</td></tr>
+                    <tr><th>Parameters</th><td>${modelMetadata.num_parameters || '—'}</td></tr>
+                    <tr><th>Compartments</th><td>${modelMetadata.num_compartments || '—'}</td></tr>
+                    <tr><th>Reactions</th><td>${modelMetadata.num_reactions || '—'}</td></tr>
+                    <tr><th>Time Units</th><td>${modelMetadata.time_units || '—'}</td></tr>
+                    <tr><th>Substance Units</th><td>${modelMetadata.substance_units || '—'}</td></tr>
+                `;
+                
+                document.getElementById('modelInfoSection').style.display = 'block';
+                setupFooter();
+
+            } catch (error) {
+                console.error('Error loading metadata:', error);
+            }
+        }
+
+        function loadSpeciesInfo() {
+            try {
+                const speciesJson = get_species_info();
+                speciesInfo = JSON.parse(speciesJson);
+                console.log('Species info loaded:', speciesInfo);
+            } catch (error) {
+                console.error('Error loading species info:', error);
+                speciesInfo = [];
+            }
+        }
+
+        function loadParametersInfo() {
+            try {
+                const paramsJson = get_parameters_info();
+                parametersInfo = JSON.parse(paramsJson);
+                console.log('Parameters info loaded:', parametersInfo);
+            } catch (error) {
+                console.error('Error loading parameters info:', error);
+                parametersInfo = [];
+            }
+        }
+
+        function loadDefaultParameters() {
+            try {
+                const defaultsJson = get_default_parameters();
+                defaultParams = JSON.parse(defaultsJson);
+
+                parametersInfo.forEach(param => {
+                    if (param.required && (defaultParams[param.id] === null || defaultParams[param.id] === undefined)) {
+                        defaultParams[param.id] = 1.0;
+                        console.warn(`Parameter '${param.id}' has null default. Using fallback: 1.0`);
+                    }
+                });
+
+                console.log('Default parameters loaded:', defaultParams);
+            } catch (error) {
+                console.error('Error loading defaults:', error);
+            }
+        }
+
+        // ============ Dynamic Form Generation ============
+
+        function categorizeParameters(params) {
+            const categories = {
+                'Simulation Settings': [],
+                'Initial Conditions': [],
+                'Rate Constants': [],
+                'Dosing Parameters': [],
+                'Physiological Parameters': [],
+                'Other Parameters': []
+            };
+
+            params.forEach(param => {
+                const id = param.id.toLowerCase();
+                const name = (param.name || '').toLowerCase();
+
+                if (id.includes('final_time') || id.includes('duration') || id.includes('step') || 
+                    id.includes('t0') || id.includes('start')) {
+                    categories['Simulation Settings'].push(param);
+                } else if (id.startsWith('init_') || id.includes('initial') || name.includes('initial')) {
+                    categories['Initial Conditions'].push(param);
+                } else if (id.includes('k') && (id.includes('abs') || id.includes('elm') || id.includes('rate'))) {
+                    categories['Rate Constants'].push(param);
+                } else if (id.includes('dose') || id.includes('period') || id.includes('n_') || 
+                           id.includes('d_o') || id.includes('eoa')) {
+                    categories['Dosing Parameters'].push(param);
+                } else if (id.includes('volume') || id.includes('plasma') || id.includes('comp') ||
+                           id.includes('tissue') || id.includes('blood')) {
+                    categories['Physiological Parameters'].push(param);
+                } else {
+                    categories['Other Parameters'].push(param);
+                }
+            });
+
+            Object.keys(categories).forEach(key => {
+                if (categories[key].length === 0) {
+                    delete categories[key];
+                }
+            });
+
+            return categories;
+        }
+
+        function generateParameterForm() {
+            const container = document.getElementById('parameterSections');
+            container.innerHTML = '';
+
+            const categorized = categorizeParameters(parametersInfo);
+            let isFirst = true;
+
+            Object.entries(categorized).forEach(([category, params]) => {
+                const section = document.createElement('div');
+                section.className = 'param-section' + (isFirst ? ' open' : '');
+
+                // Section header (collapsible)
+                const header = document.createElement('div');
+                header.className = 'param-section-header';
+                header.innerHTML = `
+                    <h3 class="param-section-title">${category}</h3>
+                    <span class="toggle-icon">▼</span>
+                `;
+                header.addEventListener('click', () => {
+                    section.classList.toggle('open');
+                });
+
+                // Section content
+                const content = document.createElement('div');
+                content.className = 'param-section-content';
+
+                params.forEach(param => {
+                    const group = document.createElement('div');
+                    group.className = 'form-group';
+
+                    const label = document.createElement('label');
+                    label.setAttribute('for', param.id);
+                    label.innerHTML = `${param.name || param.id}${param.units ? ` <span class="unit">[${param.units}]</span>` : ''}`;
+
+                    const input = document.createElement('input');
+                    input.type = 'number';
+                    input.id = param.id;
+                    input.name = param.id;
+                    input.step = 'any';
+                    input.required = param.required || false;
+
+                    if (defaultParams[param.id] !== null && defaultParams[param.id] !== undefined) {
+                        input.value = defaultParams[param.id];
+                    }
+
+                    group.appendChild(label);
+                    group.appendChild(input);
+                    content.appendChild(group);
+                });
+
+                section.appendChild(header);
+                section.appendChild(content);
+                container.appendChild(section);
+
+                isFirst = false;
+            });
+        }
+
+        function populateFormDefaults() {
+            Object.entries(defaultParams).forEach(([key, value]) => {
+                const input = document.getElementById(key);
+                if (input && value !== null && value !== undefined) {
+                    input.value = value;
+                }
+            });
+        }
+
+        // ============ Simulation Functions ============
+
+        function getFormParameters() {
+            const formData = new FormData(paramForm);
+            const params = { ...defaultParams };
+
+            for (const [key, value] of formData.entries()) {
+                const numValue = parseFloat(value);
+                if (!isNaN(numValue)) {
+                    params[key] = numValue;
+                }
+            }
+
+            return params;
+        }
+
+        function runSimulation(params) {
+            try {
+                updateStatus('Running simulation...', 'loading', true);
+                btnSimulate.disabled = true;
+
+                const sanitizedParams = Object.fromEntries(
+                    Object.entries(params).filter(([_, v]) => v !== null && v !== undefined)
+                );
+
+                const result = run_simulation(JSON.stringify(sanitizedParams));
+                const output = JSON.parse(result);
+
+                console.log('Simulation output:', output);
+
+                // Initialize visibility state for all species
+                if (output.species) {
+                    Object.keys(output.species).forEach(name => {
+                        if (visibilityState[name] === undefined) {
+                            visibilityState[name] = true;
+                        }
+                    });
+                }
+
+                updateSimulationSummary(output);
+                visualizeResults(output);
+                generateCollapsibleResults(output);
+
+                updateStatus('Simulation completed successfully.', 'success');
+                btnSimulate.disabled = false;
+
+            } catch (error) {
+                console.error('Simulation error:', error);
+                updateStatus(`Simulation failed: ${error.message}`, 'error');
+                btnSimulate.disabled = false;
+            }
+        }
+
+        function updateSimulationSummary(output) {
+            const timePoints = output.time ? output.time.length : 0;
+            const duration = output.time && timePoints > 0 ? output.time[timePoints - 1] : 0;
+            const speciesCount = output.species ? Object.keys(output.species).length : 0;
+            const timeUnits = modelMetadata?.time_units || '';
+
+            document.getElementById('summaryPoints').textContent = timePoints;
+            document.getElementById('summaryDuration').textContent = formatValue(duration, 2);
+            document.getElementById('summaryDurationUnit').textContent = timeUnits;
+            document.getElementById('summarySpecies').textContent = speciesCount;
+
+            document.getElementById('simulationSummary').style.display = 'flex';
+        }
+
+        function generateCollapsibleResults(output) {
+            const container = document.getElementById('collapsibleResults');
+            const noResults = document.getElementById('noResults');
+            container.innerHTML = '';
+
+            if (!output.species || Object.keys(output.species).length === 0) {
+                noResults.style.display = 'block';
+                return;
+            }
+
+            noResults.style.display = 'none';
+            const substanceUnits = modelMetadata?.substance_units || 'units';
+            const timeUnits = modelMetadata?.time_units || 'time';
+
+            Object.entries(output.species).forEach(([speciesName, values], index) => {
+                const info = speciesInfo.find(s => s.id === speciesName);
+                const displayName = info?.name || speciesName;
+                const color = speciesColors[index % speciesColors.length];
+
+                // Calculate statistics
+                const maxVal = Math.max(...values);
+                const minVal = Math.min(...values);
+                const finalVal = values[values.length - 1];
+                const avgVal = values.reduce((a, b) => a + b, 0) / values.length;
+                
+                const maxIndex = values.indexOf(maxVal);
+                const tMax = output.time[maxIndex];
+
+                // Calculate AUC (trapezoidal)
+                let auc = 0;
+                for (let i = 1; i < values.length; i++) {
+                    const dt = output.time[i] - output.time[i-1];
+                    auc += (values[i] + values[i-1]) / 2 * dt;
+                }
+
+                const item = document.createElement('div');
+                item.className = 'collapsible-item';
+                item.innerHTML = `
+                    <div class="collapsible-header">
+                        <div class="title">
+                            <span class="icon" style="background-color: ${color}"></span>
+                            ${displayName}
+                        </div>
+                        <div class="value">${formatValue(maxVal)} <span style="font-size: 0.7rem; color: var(--text-muted);">(max)</span></div>
+                        <span class="toggle-icon">▼</span>
+                    </div>
+                    <div class="collapsible-content">
+                        <div class="result-details">
+                            <div class="detail-item">
+                                <div class="label">Max</div>
+                                <div class="value">${formatValue(maxVal)}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="label">Min</div>
+                                <div class="value">${formatValue(minVal)}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="label">Final</div>
+                                <div class="value">${formatValue(finalVal)}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="label">T<sub>max</sub></div>
+                                <div class="value">${formatValue(tMax, 2)}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="label">Average</div>
+                                <div class="value">${formatValue(avgVal)}</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="label">AUC</div>
+                                <div class="value">${formatValue(auc, 2)}</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                const header = item.querySelector('.collapsible-header');
+                header.addEventListener('click', () => {
+                    item.classList.toggle('open');
+                });
+
+                container.appendChild(item);
+            });
+        }
+
+        function toggleSpeciesVisibility(speciesName) {
+            visibilityState[speciesName] = !visibilityState[speciesName];
+            
+            // Update chart
+            if (chart) {
+                const datasetIndex = chartDatasets.findIndex(d => d.speciesId === speciesName);
+                if (datasetIndex !== -1) {
+                    chart.setDatasetVisibility(datasetIndex, visibilityState[speciesName]);
+                    chart.update();
+                }
+            }
+
+            // Update legend item appearance
+            const legendItem = document.querySelector(`[data-species="${speciesName}"]`);
+            if (legendItem) {
+                legendItem.classList.toggle('hidden', !visibilityState[speciesName]);
+            }
+        }
+
+        function visualizeResults(output) {
+            const ctx = document.getElementById('resultsChart').getContext('2d');
+
+            if (chart) {
+                chart.destroy();
+            }
+
+            chartDatasets = [];
+            const legendContainer = document.getElementById('speciesLegend');
+            
+            // Keep the hint, clear species items
+            legendContainer.innerHTML = '<span class="legend-hint">Click to toggle visibility</span>';
+
+            if (output.species) {
+                Object.keys(output.species).forEach((speciesName, index) => {
+                    const color = speciesColors[index % speciesColors.length];
+                    const info = speciesInfo.find(s => s.id === speciesName);
+                    const displayName = info?.name || speciesName;
+
+                    const dataset = {
+                        label: displayName,
+                        speciesId: speciesName,
+                        data: output.time.map((t, i) => ({
+                            x: t,
+                            y: output.species[speciesName][i]
+                        })),
+                        borderColor: color,
+                        backgroundColor: color + '10',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.3,
+                        pointRadius: 0,
+                        pointHoverRadius: 4,
+                        hidden: !visibilityState[speciesName]
+                    };
+
+                    chartDatasets.push(dataset);
+
+                    // Create interactive legend item
+                    const legendItem = document.createElement('div');
+                    legendItem.className = 'species-legend-item' + (visibilityState[speciesName] ? '' : ' hidden');
+                    legendItem.setAttribute('data-species', speciesName);
+                    legendItem.innerHTML = `
+                        <span class="color-indicator" style="background-color: ${color}"></span>
+                        <span>${displayName}</span>
+                    `;
+                    legendItem.addEventListener('click', () => toggleSpeciesVisibility(speciesName));
+                    
+                    legendContainer.appendChild(legendItem);
+                });
+
+                legendContainer.style.display = 'flex';
+            }
+
+            const timeUnits = modelMetadata?.time_units || 'time';
+            const substanceUnits = modelMetadata?.substance_units || 'amount';
+
+            chart = new Chart(ctx, {
+                type: 'line',
+                data: { datasets: chartDatasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        title: {
+                            display: true,
+                            text: 'Species Concentration vs Time',
+                            font: { 
+                                size: 13, 
+                                weight: 'normal',
+                                family: "'Times New Roman', Georgia, serif"
+                            },
+                            color: '#1a365d',
+                            padding: { bottom: 12 }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            titleColor: '#1a365d',
+                            bodyColor: '#4a5568',
+                            borderColor: '#e2e8f0',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.dataset.label}: ${formatValue(context.parsed.y)} ${substanceUnits}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'linear',
+                            title: {
+                                display: true,
+                                text: `Time (${timeUnits})`,
+                                font: { size: 11, family: "'Times New Roman', Georgia, serif" },
+                                color: '#4a5568'
+                            },
+                            grid: { color: 'rgba(0, 0, 0, 0.06)' },
+                            ticks: { font: { family: "'Courier New', monospace", size: 9 } }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: `Concentration (${substanceUnits})`,
+                                font: { size: 11, family: "'Times New Roman', Georgia, serif" },
+                                color: '#4a5568'
+                            },
+                            grid: { color: 'rgba(0, 0, 0, 0.06)' },
+                            ticks: {
+                                font: { family: "'Courier New', monospace", size: 9 },
+                                callback: function(value) { return formatValue(value, 2); }
+                            }
+                        }
+                    },
+                    interaction: { mode: 'nearest', axis: 'x', intersect: false }
+                }
+            });
+        }
+
+        // ============ Event Handlers ============
+
+        paramForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const params = getFormParameters();
+            runSimulation(params);
+        });
+
+        btnReset.addEventListener('click', () => {
+            populateFormDefaults();
+            updateStatus('Parameters reset to defaults.', 'success');
+        });
+
+        // Model info toggle
+        document.getElementById('modelInfoToggle').addEventListener('click', function() {
+            const content = document.getElementById('modelInfoContent');
+            content.classList.toggle('open');
+            this.querySelector('.toggle-icon').textContent = content.classList.contains('open') ? '▲' : '▼';
+        });
+
+        // ============ Initialization ============
+
+        async function initialize() {
+            try {
+                updateStatus('Loading WASM module...', 'loading', true);
+
+                await init();
+
+                updateStatus('Loading model data...', 'loading', true);
+
+                loadModelMetadata();
+                loadSpeciesInfo();
+                loadParametersInfo();
+                loadDefaultParameters();
+
+                generateParameterForm();
+                setupFooter();
+
+                btnSimulate.disabled = false;
+
+                updateStatus('Model loaded. Ready to simulate.', 'success');
+
+                setTimeout(() => {
+                    const params = getFormParameters();
+                    runSimulation(params);
+                }, 300);
+
+            } catch (error) {
+                updateStatus(`Failed to initialize: ${error.message}`, 'error');
+                console.error('Initialization error:', error);
+                setupFooter();
+            }
+        }
+
+        initialize();
+    </script>
+</body>
+</html>

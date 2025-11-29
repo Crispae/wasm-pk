@@ -15,7 +15,7 @@ venv/
 .idea/
 
 # Generated Output
-pkg/
+
 runner/target/
 
 # OS

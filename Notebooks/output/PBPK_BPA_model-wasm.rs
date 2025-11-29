@@ -1,0 +1,236 @@
+// Generated WASM-compatible Rust code from SBML model: PBPK_BPA_model
+// Uses SymPy CSE for optimized derivatives and Jacobian
+
+use diffsol::{OdeBuilder, OdeSolverMethod, OdeSolverStopReason, Vector};
+use wasm_bindgen::prelude::*;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+type M = diffsol::NalgebraMat<f64>;
+type LS = diffsol::NalgebraLU<f64>;
+
+#[derive(Serialize, Deserialize)]
+pub struct SimulationResult {
+    pub species: std::collections::HashMap<String, Vec<f64>>,
+    pub time: Vec<f64>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SimulationParams {
+    pub Kabs: f64,
+    pub t0: f64,
+    pub Kelm: f64,
+    pub EoA_O: f64,
+    pub D_o: f64,
+    pub vplasma: f64,
+    pub period_O: f64,
+    pub n_O: f64,
+    pub comp1: f64,
+
+    // Initial amounts (optional, for runtime dosing)
+    pub init_Aplasma: Option<f64>,
+    pub final_time: Option<f64>,
+}
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(s: &str);
+}
+
+macro_rules! console_log {
+    ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))
+}
+
+#[wasm_bindgen]
+pub fn run_simulation(params: &str) -> String {
+    console_log!("Starting simulation...");
+
+    let sim_params: SimulationParams = match serde_json::from_str(params) {
+        Ok(p) => p,
+        Err(e) => {
+            console_log!("Error parsing params: {}", e);
+            return serde_json::to_string(&SimulationResult {
+                species: HashMap::new(),
+                time: vec![],
+            }).unwrap();
+        }
+    };
+
+    let Kabs = sim_params.Kabs;
+    let t0 = sim_params.t0;
+    let Kelm = sim_params.Kelm;
+    let EoA_O = sim_params.EoA_O;
+    let D_o = sim_params.D_o;
+    let vplasma = sim_params.vplasma;
+    let period_O = sim_params.period_O;
+    let n_O = sim_params.n_O;
+    let comp1 = sim_params.comp1;
+
+
+    let koa = 1.2e-8*EoA_O*D_o;
+    let t1 = period_O + t0;
+    let uptake_O = EoA_O*D_o*n_O.powi(-1);
+
+    // RHS Closure
+    let rhs = |y: &diffsol::NalgebraVec<f64>, _p: &diffsol::NalgebraVec<f64>, t: f64, dy: &mut diffsol::NalgebraVec<f64>| {
+        // Map species names to y indices
+        let Aplasma = y[0];
+
+        // Temporary variables (CSE)
+        let x0 = 1.0*Kelm;
+
+        // Derivatives
+        dy[0] = -1.0*Aplasma*x0 + 0.5*Kabs*koa*((100.0*t - 100.0*t0).tanh() - 1.0*(100.0*t - 100.0*t1).tanh());
+    };
+
+    // Jacobian Closure (Matrix-Vector Product)
+    let jac = |y: &diffsol::NalgebraVec<f64>, _p: &diffsol::NalgebraVec<f64>, t: f64, v: &diffsol::NalgebraVec<f64>, jv: &mut diffsol::NalgebraVec<f64>| {
+        for i in 0..jv.len() { jv[i] = 0.0; }
+
+        // Map species names to y indices
+        let Aplasma = y[0];
+
+        // Temporary variables (CSE)
+        let x0 = 1.0*Kelm;
+
+        // Jacobian-Vector Product
+        jv[0] += (-1.0*x0) * v[0];
+    };
+
+    let init = |_y0: &diffsol::NalgebraVec<f64>, _t: f64, y: &mut diffsol::NalgebraVec<f64>| {
+        y[0] = sim_params.init_Aplasma.unwrap_or(0.0);
+    };
+    let problem = OdeBuilder::<M>::new()
+        .rhs_implicit(rhs, jac)
+        .init(init, 1)
+        .build()
+        .unwrap();
+
+    let mut solver = problem.bdf::<LS>().unwrap();
+    let mut time = Vec::new();
+
+    // Initialize result vectors
+    let mut aplasma = Vec::new();
+
+    aplasma.push(solver.state().y[0]);
+    time.push(0.0);
+
+    let final_time = sim_params.final_time.unwrap_or(24.0);
+    solver.set_stop_time(final_time).unwrap();
+    loop {
+        match solver.step() {
+            Ok(OdeSolverStopReason::InternalTimestep) => {
+            aplasma.push(solver.state().y[0]);
+                time.push(solver.state().t);
+            },
+            Ok(OdeSolverStopReason::TstopReached) => break,
+            Ok(OdeSolverStopReason::RootFound(_)) => break,
+            Err(_) => panic!("Solver Error"),
+        }
+    }
+
+    let mut species_map = HashMap::new();
+        species_map.insert("aplasma".to_string(), aplasma);
+
+    let result = SimulationResult {
+        time,
+        species: species_map,
+    };
+
+    serde_json::to_string(&result).unwrap()
+}
+
+#[wasm_bindgen]
+pub fn get_model_metadata() -> String {
+    let metadata = serde_json::json!({
+        "model_id": "PBPK_BPA_model",
+        "num_species": 1,
+        "num_parameters": 9,
+        "time_units": "HR",
+        "substance_units": "MilliMOL",
+        "volume_units": "L"
+    });
+    serde_json::to_string(&metadata).unwrap()
+}
+
+#[wasm_bindgen]
+pub fn get_parameters_info() -> String {
+    let params = serde_json::json!([
+        {
+            "id": "Kabs",
+            "default_value": 0.4,
+            "required": true
+        },
+        {
+            "id": "t0",
+            "default_value": 0.0,
+            "required": true
+        },
+        {
+            "id": "Kelm",
+            "default_value": 0.13,
+            "required": true
+        },
+        {
+            "id": "EoA_O",
+            "default_value": 1.0,
+            "required": true
+        },
+        {
+            "id": "D_o",
+            "default_value": 1.3381102,
+            "required": true
+        },
+        {
+            "id": "vplasma",
+            "default_value": 3.6,
+            "required": true
+        },
+        {
+            "id": "period_O",
+            "default_value": 0.0003,
+            "required": true
+        },
+        {
+            "id": "n_O",
+            "default_value": 1.0,
+            "required": true
+        },
+        {
+            "id": "comp1",
+            "default_value": null,
+            "required": true
+        }
+    ]);
+    serde_json::to_string(&params).unwrap()
+}
+
+#[wasm_bindgen]
+pub fn get_species_info() -> String {
+    let species = serde_json::json!([
+        {
+            "id": "Aplasma",
+            "initial_amount": 0.0,
+            "units": "MilliMOL"
+        }
+    ]);
+    serde_json::to_string(&species).unwrap()
+}
+
+#[wasm_bindgen]
+pub fn get_default_parameters() -> String {
+    let defaults = serde_json::json!({
+        "Kabs": 0.4,
+        "t0": 0.0,
+        "Kelm": 0.13,
+        "EoA_O": 1.0,
+        "D_o": 1.3381102,
+        "vplasma": 3.6,
+        "period_O": 0.0003,
+        "n_O": 1.0,
+        "comp1": null,
+        "final_time": 24.0
+    });
+    serde_json::to_string(&defaults).unwrap()
+}
