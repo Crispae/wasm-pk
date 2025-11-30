@@ -1,7 +1,9 @@
-// Generated native Rust code from SBML model: talinolol_model
+#![recursion_limit = "256"]
+// Generated WASM-compatible Rust code from SBML model: talinolol_model
 // Uses SymPy CSE for optimized derivatives and Jacobian
 
 use diffsol::{OdeBuilder, OdeSolverMethod, OdeSolverStopReason, Vector};
+use wasm_bindgen::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -80,13 +82,24 @@ pub struct SimulationParams {
     pub final_time: Option<f64>,
 }
 
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(s: &str);
+}
+
+macro_rules! console_log {
+    ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))
+}
+
+#[wasm_bindgen]
 pub fn run_simulation(params: &str) -> String {
-    println!("Starting simulation...");
+    console_log!("Starting simulation...");
 
     let sim_params: SimulationParams = match serde_json::from_str(params) {
         Ok(p) => p,
         Err(e) => {
-            eprintln!("Error parsing params: {}", e);
+            console_log!("Error parsing params: {}", e);
             return serde_json::to_string(&SimulationResult {
                 species: HashMap::new(),
                 time: vec![],
@@ -575,6 +588,7 @@ pub fn run_simulation(params: &str) -> String {
     serde_json::to_string(&result).unwrap()
 }
 
+#[wasm_bindgen]
 pub fn get_model_metadata() -> String {
     let metadata = serde_json::json!({
         "model_id": "talinolol_model",
@@ -587,6 +601,7 @@ pub fn get_model_metadata() -> String {
     serde_json::to_string(&metadata).unwrap()
 }
 
+#[wasm_bindgen]
 pub fn get_parameters_info() -> String {
     let params = serde_json::json!([
         {
@@ -808,6 +823,7 @@ pub fn get_parameters_info() -> String {
     serde_json::to_string(&params).unwrap()
 }
 
+#[wasm_bindgen]
 pub fn get_species_info() -> String {
     let species = serde_json::json!([
         {
@@ -894,6 +910,7 @@ pub fn get_species_info() -> String {
     serde_json::to_string(&species).unwrap()
 }
 
+#[wasm_bindgen]
 pub fn get_default_parameters() -> String {
     let defaults = serde_json::json!({
         "BW": 75.0,

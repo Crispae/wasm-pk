@@ -1,6 +1,7 @@
+#![recursion_limit = "256"]
+
 // Generated native Rust code from SBML model: talinolol_model
 // Uses SymPy CSE for optimized derivatives and Jacobian
-
 use diffsol::{OdeBuilder, OdeSolverMethod, OdeSolverStopReason, Vector};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

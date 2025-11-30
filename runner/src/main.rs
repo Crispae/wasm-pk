@@ -1,59 +1,47 @@
-mod pbpk_bpa_model;  // This will use your generated model
-
+#![recursion_limit = "256"]
 use std::fs;
 
+mod talinolol_model;
+
 fn main() {
-    // Create JSON parameters matching SimulationParams struct for euromix model
-    let params_json = r#"
-    {
-        "BM": 70.0,
-        "BSA": 190.0,
-        "scVFat": 0.209,
-        "scVRich": 0.105,
-        "scVLiver": 0.024,
-        "scVBlood": 0.068,
-        "scVArt": 0.333333333333333,
-        "scFBlood": 4.8,
-        "scFFat": 0.085,
-        "scFPoor": 0.12,
-        "scFLiver": 0.27,
-        "scFSkin": 0.05,
-        "fSA_exposed": 0.1,
-        "Height_sc": 0.0001,
-        "Height_vs": 0.0122,
-        "Falv": 2220.0,
-        "PCFat": 2.53,
-        "PCLiver": 0.923,
-        "PCRich": 0.875,
-        "PCPoor": 0.647,
-        "PCSkin_sc": 0.889,
-        "PCSkin": 0.889,
-        "PCAir": 1e99,
-        "kGut": 1.0,
-        "Kp_sc_vs": 0.01,
-        "Km": 0.0,
-        "Michaelis": 0.0,
-        "Vmax": 0.0,
-        "CLH": 132.0,
-        "Ke": 7.5,
-        "fub": 0.51,
-        "Air": 1.0,
-        "Urine": 1.0,
-        "Gut": 1.0,
-        "final_time": 24.0
-    }
-    "#;
-
-    //println!("Running euromix simulation...");
-    //let result = pbpk_bpa_model::run_simulation(params_json);
+    println!("Retrieving default parameters...");
+    let default_params = talinolol_model::get_default_parameters();
+    println!("Default parameters loaded successfully\n");
     
-     // Save JSON result
-     //std::fs::write("result.json", &result)
-     //.expect("Failed to write result.json");
-
-     let params = pbpk_bpa_model::get_default_parameters();
-     println!("Default parameters: {}", params);
- 
-    println!("Simulation completed!");
-    println!("Result saved to result.json");
+    // Save default parameters to file for reference
+    fs::write("default_params.json", &default_params)
+        .expect("Failed to write default_params.json");
+    println!("Default parameters saved to default_params.json\n");
+    
+    // Run simulation with default parameters (no dose - baseline)
+    println!("Running baseline simulation (no drug dose)...");
+    let result = talinolol_model::run_simulation(&default_params);
+    
+    // Save baseline result
+    fs::write("result_baseline.json", &result)
+        .expect("Failed to write result_baseline.json");
+    println!("Baseline simulation completed!");
+    println!("Result saved to result_baseline.json\n");
+    
+    // Run simulation with IV dose
+    println!("Running simulation with 50mg IV dose...");
+    let mut params_with_dose: serde_json::Value = serde_json::from_str(&default_params).unwrap();
+    params_with_dose["IVDOSE_tal"] = serde_json::json!(50.0); // 50mg IV dose
+    let params_with_dose_str = serde_json::to_string(&params_with_dose).unwrap();
+    let result_with_dose = talinolol_model::run_simulation(&params_with_dose_str);
+    
+    // Save result with dose
+    fs::write("result_with_dose.json", &result_with_dose)
+        .expect("Failed to write result_with_dose.json");
+    println!("Simulation with dose completed!");
+    println!("Result saved to result_with_dose.json\n");
+    
+    // Get model metadata
+    let metadata = talinolol_model::get_model_metadata();
+    println!("Model metadata: {}", metadata);
+    
+    println!("\nAll done! Check the output files:");
+    println!("  - default_params.json: Model parameters");
+    println!("  - result_baseline.json: Baseline simulation (no dose)");
+    println!("  - result_with_dose.json: Simulation with 50mg IV dose");
 }

@@ -76,7 +76,7 @@ with open("my_model.rs", "w") as f:
 
 ## Docker WASM Build
 
-After generating Rust code, you can compile it to WebAssembly using Docker.
+After generating Rust code, you can compile it to WebAssembly using Docker. The optimized Docker build includes layer caching to speed up rebuilds.
 
 ### Prerequisites
 - Docker installed and running
@@ -87,6 +87,12 @@ After generating Rust code, you can compile it to WebAssembly using Docker.
 ```bash
 docker build -t sbml-wasm .
 ```
+
+**Optimization Note:** The Dockerfile uses multi-stage builds to cache:
+- Rust toolchain and wasm-pack (only rebuilds when base image changes)
+- System dependencies (cached in separate layer)
+
+Subsequent builds are much faster as they reuse these cached layers.
 
 ### Running the Container
 
@@ -105,11 +111,33 @@ docker run -v $(pwd):/app sbml-wasm /app/Notebooks/output/euromix_model.rs /app/
 2. Second argument: Output directory for the WASM package (relative to /app in container)
 
 ### Output
-The WASM package will be created in the specified output directory with:
+The release package will be created in the specified output directory with:
 - `sbml_model_bg.wasm` - The compiled WebAssembly binary
 - `sbml_model.js` - JavaScript bindings
 - `sbml_model.d.ts` - TypeScript definitions
 - `package.json` - NPM package metadata
+- `index.html` - **Web UI for interactive simulation**
+- `RELEASE.md` - Release documentation and usage instructions
+
+### Using the Release Package
+
+After building, you can:
+
+**Option 1: Open directly**
+```bash
+# Navigate to the output directory and open index.html in your browser
+cd pkg/
+open index.html  # macOS
+start index.html # Windows
+xdg-open index.html # Linux
+```
+
+**Option 2: Serve with HTTP server**
+```bash
+cd pkg/
+python -m http.server 8000
+# Navigate to http://localhost:8000/
+```
 
 ### Example Workflow
 
@@ -118,7 +146,18 @@ The WASM package will be created in the specified output directory with:
 3. Run the build:
    - **PowerShell**: `docker run -v ${PWD}:/app sbml-wasm /app/Notebooks/output/euromix_model.rs /app/pkg`
    - **Bash**: `docker run -v $(pwd):/app sbml-wasm /app/Notebooks/output/euromix_model.rs /app/pkg`
-4. The WASM package will be in the `pkg/` directory
+4. The complete release package (WASM + UI) will be in the `pkg/` directory
+5. Open `pkg/index.html` or serve the directory to run simulations
+
+### Docker Optimizations
+
+The Dockerfile is optimized for faster builds:
+- **Layer caching**: Rust toolchain and wasm-pack are cached
+- **Smaller context**: `.dockerignore` excludes unnecessary files
+- **Multi-stage build**: Separates base tools from build execution
+- **Slim base image**: Uses `rust:1.75-slim` for smaller image size
+
+First build may take a few minutes, but rebuilds with updated Rust code are much faster.
 
 ## Usage Examples
 

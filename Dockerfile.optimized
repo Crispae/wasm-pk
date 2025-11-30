@@ -3,7 +3,8 @@
 # ============================================================================
 # This Dockerfile uses multi-stage builds to optimize layer caching:
 # 1. Base layer with Rust and wasm-pack (cached unless versions change)
-# 2. Build layer (only rebuilds when source code changes)
+# 2. Dependency layer (cached unless Cargo.toml changes)
+# 3. Build layer (only rebuilds when source code changes)
 # ============================================================================
 
 # ============================================================================
@@ -23,54 +24,14 @@ RUN apt-get update && \
 # Install wasm-pack (this is cached in the layer)
 RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
-# Add wasm32 target for Rust
-RUN rustup target add wasm32-unknown-unknown
-
 # Set working directory
 WORKDIR /build
 
 # ============================================================================
-# Stage 2: Dependency Builder
-# This stage builds the dependencies to create a cached layer
-# ============================================================================
-FROM base as deps
-
-WORKDIR /build/cache
-
-# Create a dummy project
-RUN cargo new --lib sbml_wasm_project
-WORKDIR /build/cache/sbml_wasm_project
-
-# Create Cargo.toml with all dependencies
-# We use a heredoc to create the file content directly
-RUN echo '[package]\n\
-name = "sbml_wasm_project"\n\
-version = "0.1.0"\n\
-edition = "2021"\n\
-\n\
-[lib]\n\
-crate-type = ["cdylib"]\n\
-\n\
-[dependencies]\n\
-wasm-bindgen = "0.2"\n\
-serde = { version = "1.0", features = ["derive"] }\n\
-serde_json = "1.0"\n\
-diffsol = "0.6.3"\n\
-getrandom = { version = "0.2", features = ["js"] }' > Cargo.toml
-
-# Build dependencies (release mode for wasm)
-# This compiles all dependencies and caches them
-RUN cargo build --release --target wasm32-unknown-unknown
-RUN wasm-pack build --target web --out-dir pkg --out-name sbml_model
-
-# ============================================================================
-# Stage 3: Production Builder
+# Stage 2: Production Builder
 # This is the final stage that executes the build
 # ============================================================================
 FROM base as builder
-
-# Copy the pre-built project template with cached dependencies
-COPY --from=deps /build/cache/sbml_wasm_project /build/cache/sbml_wasm_project
 
 # Copy the build script
 COPY build_wasm.sh /usr/local/bin/build_wasm.sh

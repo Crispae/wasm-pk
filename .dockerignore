@@ -1,0 +1,48 @@
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Virtual environments
+venv/
+.venv/
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+Notebooks/*.ipynb
+Notebooks/output/
+Notebooks/plots/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Generated output (don't copy to Docker context)
+pkg/
+runner/target/
+wasm-test/
+
+# Version control
+.git/
+.gitignore
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation
+*.md
+!README.md
+
+# Tests
+tests/
+pytest.ini
+
+# Data files that aren't needed for build
+data/*.sbml
+data/*.xml

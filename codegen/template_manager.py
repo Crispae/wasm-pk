@@ -67,6 +67,7 @@ class RustTemplateManager:
 
         # Header comment
         if wasm:
+            template_parts.append("#![recursion_limit = \"256\"]\n")
             template_parts.append(
                 f"// Generated WASM-compatible Rust code from SBML model: {model_name}\n"
             )
@@ -153,7 +154,7 @@ class RustTemplateManager:
 
         template_parts.append(components["param_extract"])
         template_parts.append("\n")
-        template_parts.append(components.get("assignment_rules", ""))
+        # Assignment rules moved to inside closures to access species
         template_parts.append("\n\n")
         template_parts.append(components.get("initial_assignments", ""))
         template_parts.append("\n\n")
@@ -165,6 +166,9 @@ class RustTemplateManager:
         )
         template_parts.append("        // Map species names to y indices\n")
         template_parts.append(components["species_extract"])
+        template_parts.append("\n\n")
+        template_parts.append("        // Assignment Rules\n")
+        template_parts.append(components.get("assignment_rules", ""))
         template_parts.append("\n\n")
         template_parts.append("        // Temporary variables (CSE)\n")
         template_parts.append(components["temp_vars"])
@@ -181,6 +185,9 @@ class RustTemplateManager:
         template_parts.append("        for i in 0..jv.len() { jv[i] = 0.0; }\n\n")
         template_parts.append("        // Map species names to y indices\n")
         template_parts.append(components["species_extract"])
+        template_parts.append("\n\n")
+        template_parts.append("        // Assignment Rules\n")
+        template_parts.append(components.get("assignment_rules", ""))
         template_parts.append("\n\n")
         template_parts.append("        // Temporary variables (CSE)\n")
         template_parts.append(components["temp_vars"])

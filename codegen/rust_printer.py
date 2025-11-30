@@ -50,7 +50,7 @@ class CustomRustCodePrinter(RustCodePrinter):
             exp_str = self._print(exp)
             # Ensure float literal
             if re.match(r"^-?\d+$", exp_str):
-                exp_str = exp_str + ".0"
+                exp_str = exp_str + ".0_f64"
             return f"{base}.powf({exp_str})"
 
     def _print_Piecewise(self, expr):
@@ -78,7 +78,7 @@ class CustomRustCodePrinter(RustCodePrinter):
             e_str = self._print(e)
             # If it's just an integer literal, make it a float
             if re.match(r"^-?\d+$", e_str):
-                e_str = e_str + ".0"
+                e_str = e_str + ".0_f64"
             lines.append("    %s" % e_str)
 
         lines.append("}")
@@ -139,7 +139,7 @@ class CustomRustCodePrinter(RustCodePrinter):
         Returns:
             Float literal string
         """
-        return str(expr) + ".0"
+        return str(expr) + ".0_f64"
 
     def _print_int(self, expr):
         """Always print Python ints as floats
@@ -150,7 +150,7 @@ class CustomRustCodePrinter(RustCodePrinter):
         Returns:
             Float literal string
         """
-        return str(expr) + ".0"
+        return str(expr) + ".0_f64"
 
     def _print_Zero(self, expr):
         """Print Zero as 0.0
@@ -161,7 +161,7 @@ class CustomRustCodePrinter(RustCodePrinter):
         Returns:
             "0.0"
         """
-        return "0.0"
+        return "0.0_f64"
 
     def _print_Rational(self, expr):
         """Print rational numbers as float division
