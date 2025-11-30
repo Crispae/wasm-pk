@@ -156,7 +156,19 @@ class RustTemplateManager:
         template_parts.append("\n")
         # Assignment rules moved to inside closures to access species
         template_parts.append("\n\n")
-        template_parts.append(components.get("initial_assignments", ""))
+        # Static Initial assignments (ModelValue_X, etc.) must come BEFORE static rules
+        template_parts.append(components.get("initial_assignments_static", ""))
+        template_parts.append("\n")
+        
+        template_parts.append(components.get("static_assignment_rules", ""))
+        template_parts.append("\n")
+        
+        # Dynamic Initial assignments that don't depend on rules come next
+        template_parts.append(components.get("initial_assignments_dynamic_before", ""))
+        template_parts.append("\n")
+        
+        # Dynamic Initial assignments that depend on rules come last
+        template_parts.append(components.get("initial_assignments_dynamic_after", ""))
         template_parts.append("\n\n")
         template_parts.append(components.get("root_fn", ""))
 

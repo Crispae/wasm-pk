@@ -41,7 +41,7 @@ class EventCodeGenerator:
         event_handling = self._generate_event_callback(events, species_map)
         
         # Generate root registration for OdeBuilder
-        root_registration = f".root({len(events)}, root_fn)"
+        root_registration = f".root(root_fn, {len(events)})"
         
         return {
             "root_fn": root_fn,
@@ -106,7 +106,7 @@ class EventCodeGenerator:
         code += "                match root_idx {\n"
         
         for idx, (event_id, event_data) in enumerate(events.items()):
-            code += f"                    {idx} => {{\n"
+            code += f"                    {idx}.0 => {{\n"
             code += f"                        // Event: {event_id}\n"
             
             # Get event assignments
@@ -120,18 +120,34 @@ class EventCodeGenerator:
                     continue
                 
                 try:
-                    # Parse assignment MathML
+                    # Parse assignment math
                     expr = self.expression_parser.parse(math_ml)
                     rust_expr = self.code_gen.generate(expr)
+                    
+                    # Extract variables used in the expression
+                    free_symbols = {str(s) for s in expr.free_symbols}
+                    
+                    # Generate extraction code for used variables
+                    extraction_code = ""
+                    for sym in free_symbols:
+                        # Check if it's a species
+                        if sym in species_map:
+                            idx = species_map[sym]
+                            extraction_code += f"                        let {sym} = solver.state().y[{idx}];\n"
+                        # Parameters/Compartments/Rules are available in local scope (captured)
+                        # So we don't need to extract them from sim_params
+                            
+                    code += extraction_code
                     
                     # Determine if variable is a species or parameter
                     if variable in species_map:
                         idx_var = species_map[variable]
+                        # Use lowercase variable name for consistency with species extraction
+                        var_name = variable.lower() if variable.lower() in [s.lower() for s in species_map.keys()] else variable
                         code += f"                        solver.state_mut().y[{idx_var}] = {rust_expr};\n"
                         code += f"                        console_log!(\"  {variable} = {{}}\", {rust_expr});\n"
                     else:
                         # It's a parameter - we can't modify parameters during simulation
-                        # This is a limitation, but valid in SBML
                         code += f"                        // WARNING: Cannot modify parameter {variable} during simulation\n"
                         code += f"                        console_log!(\"  Skipping parameter assignment: {variable}\");\n"
                     

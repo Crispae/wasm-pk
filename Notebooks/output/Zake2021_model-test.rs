@@ -142,45 +142,44 @@ pub fn run_simulation(params: &str) -> String {
     let StomachLumen = sim_params.StomachLumen;
 
 
-    let Compartment_18 = StomachLumen;
-    let Compartment_6 = Feces;
-    let Compartment_0 = IntestineLumen;
-    let ModelValue_0 = Metformin_Dose_in_Lumen_in_mg;
-    let Compartment_5 = Urine;
-    let ModelValue_3 = Cardiac_Output;
-    let ModelValue_1 = Body_Weight;
-    let QIntestineVascular: f64 = 27.0/200.0*ModelValue_3;
-    let QHeart: f64 = 33.0/500.0*ModelValue_3;
-    let Stomach: f64 = 3.0/500.0*ModelValue_1;
-    let PlasmaVenous: f64 = 3.0/80.0*ModelValue_1;
-    let QBrain: f64 = 33.0/1000.0*ModelValue_3;
-    let Lung: f64 = 73.0/10000.0*ModelValue_1;
-    let Adipose: f64 = 7.0/100.0*ModelValue_1;
-    let QMuscle: f64 = 159.0/1000alue_3;
-    let QRemainder: f64 = 411.0/1000.0*M.0*ModelValue_3;
-    let QLiverArtery: f64 = 1.0/50.0*ModelValue_3;
-    let QAdipose: f64 = 1.0/200.0*ModelVodelValue_3;
-    let PortalVein: f64 = 29.0/5000.0*ModelValue_1;
-    let IntestineEnterocytes: f64 = 1.0/400.0*ModelValue_1;
-    let KidneyPlasma: f64 = 7.0/1250.0*ModelValue_1;
-    let KidneyTissue: f64 = 7.0/1250.0*ModelValue_1;
-    let QStomach: f64 = 1.0/50.0*ModelValue_3;
-    let Heart: f64 = 1.0/200.0*ModelValue_1;
-    let PlasmaArterial: f64 = 1.0/80.0*ModelValue_1;
-    let QPortalVein: f64 = 3.0/50.0*ModelValue_3;
-    let Brain: f64 = 33.0/2000.0*ModelValue_1;
-    let Liver: f64 = 549.0/10000.0*ModelValue_1;
-    let KidneyTubular: f64 = 7.0/1250.0*ModelValue_1;
-    let QKidney: f64 = 91.0/1000.0*ModelValue_3;
-    let IntestineVascular: f64 = 57.0/2500.0*ModelValue_1;
-    let Muscle: f64 = 48.0/125.0*ModelValue_1;
-    let Remainder: f64 = 717.0/2000.0*ModelValue_1;
+    let Liver = 0.0549*ModelValue_1;
+    let KidneyPlasma = 0.0056*ModelValue_1;
+    let Remainder = 0.3585*ModelValue_1;
+    let PlasmaVenous = 0.0375*ModelValue_1;
+    let Heart = 0.005*ModelValue_1;
+    let Muscle = 0.384*ModelValue_1;
+    let Brain = 0.0165*ModelValue_1;
+    let Adipose = 0.07*ModelValue_1;
+    let PlasmaArterial = 0.0125*ModelValue_1;
+    let Lung = 0.0073*ModelValue_1;
+    let PortalVein = 0.0058*ModelValue_1;
+    let Stomach = 0.006*ModelValue_1;
+    let IntestineEnterocytes = 0.0025*ModelValue_1;
+    let KidneyTissue = 0.0056*ModelValue_1;
+    let IntestineVascular = 0.0228*ModelValue_1;
+    let KidneyTubular = 0.0056*ModelValue_1;
+    let QAdipose = 0.005*ModelValue_3;
+    let QBrain = 0.033*ModelValue_3;
+    let QHeart = 0.066*ModelValue_3;
+    let QKidney = 0.091*ModelValue_3;
+    let QMuscle = 0.159*ModelValue_3;
+    let QRemainder = 0.411*ModelValue_3;
+    let QLiverArtery = 0.02*ModelValue_3;
+    let QStomach = 0.02*ModelValue_3;
+    let QPortalVein = 0.06*ModelValue_3;
+    let QIntestineVascular = 0.135*ModelValue_3;
+    let QPortalVeinOut = ModelValue_35 + ModelValue_36 + ModelValue_37;
+    let QLiverOut = ModelValue_34 + ModelValue_47;
+    let mgIntestineTotal = mgIntestineEnterocytes + mgIntestineVascular;
+    let mgKidneyTotal = mgKidneyPlasma + mgKidneyTissues + mgKidneyTubular;
 
-    let mPlasmaVenous = 1000000.0_f64*Metformin_Dose_in_Plasma_in_mg*(3229.0/25.0*PlasmaVenous).powi(-1)*PlasmaVenous;
+    let mPlasmaVenous = 7742.33508826262*Metformin_Dose_in_Plasma_in_mg;
     let Compartment_10 = Adipose;
     let Compartment_9 = Brain;
+    let Compartment_6 = Feces;
     let Compartment_7 = Heart;
     let Compartment_15 = IntestineEnterocytes;
+    let Compartment_0 = IntestineLumen;
     let Compartment_17 = IntestineVascular;
     let Compartment_2 = KidneyPlasma;
     let Compartment_16 = KidneyTissue;
@@ -192,7 +191,12 @@ pub fn run_simulation(params: &str) -> String {
     let Compartment_4 = PlasmaVenous;
     let Compartment_13 = PortalVein;
     let Compartment_3 = Remainder;
+    let Compartment_18 = StomachLumen;
     let Compartment_14 = Stomach;
+    let Compartment_5 = Urine;
+    let ModelValue_1 = Body_Weight;
+    let ModelValue_3 = Cardiac_Output;
+    let ModelValue_0 = Metformin_Dose_in_Lumen_in_mg;
     let ModelValue_37 = QIntestineVascular;
     let ModelValue_34 = QLiverArtery;
     let ModelValue_47 = QPortalVeinOut;
@@ -201,7 +205,7 @@ pub fn run_simulation(params: &str) -> String {
 
     let root_fn = |y: &diffsol::NalgebraVec<f64>, _p: &diffsol::NalgebraVec<f64>, t: f64, roots: &mut diffsol::NalgebraVec<f64>| {
         // Event Oral_at_0_001: trigger
-        roots[0] = (t > 1.0/1000.0) as i32 as f64 - 0.5;
+        roots[0] = (t > 0.001) as i32 as f64 - 0.5;
     };
 
     // RHS Closure
@@ -229,33 +233,29 @@ pub fn run_simulation(params: &str) -> String {
         let mKidneyTubular = y[19];
 
         // Assignment Rules
-    let mgUrine = 1.0/1000000.0*3229.0/25.0*mUrine*Urine.powi(-1)*Compartment_5;
-    let mgFeces = 1.0/1000000.0*3229.0/25.0*mFeces*Feces.powi(-1)*Compartment_6;
-    let mgIntestineLumen = 1.0/1000000.0*3229.0/25.0*mIntestineLumen*IntestineLumen.powi(-1)*Compartment_0;
-    let mgStomachLumen = 1.0/1000000.0*3229.0/25.0*mStomachLumen*StomachLumen.powi(-1)*Compartment_18;
-    let QPortalVeinOut = ModelValue_37 + (ModelValue_35 + ModelValue_36);
-    let QLiverOut = ModelValue_34 + ModelValue_47;
-    let mgLiver = 1.0/1000000.0*3229.0/25.0*mLiver*Liver.powi(-1)*Compartment_1;
-    let mgKidneyPlasma = 1.0/1000000.0*3229.0/25.0*mKidneyPlasma*KidneyPlasma.powi(-1)*Compartment_2;
-    let mgRemainder = 1.0/1000000.0*3229.0/25.0*mRemainder*Remainder.powi(-1)*Compartment_3;
-    let mgPlasmaVenous = 1.0/1000000.0*3229.0/25.0*mPlasmaVenous*PlasmaVenous.powi(-1)*Compartment_4;
-    let mgHeart = 1.0/1000000.0*3229.0/25.0*mHeart*Heart.powi(-1)*Compartment_7;
-    let mgMuscle = 1.0/1000000.0*3229.0/25.0*mMuscle*Muscle.powi(-1)*Compartment_8;
-    let mgBrain = 1.0/1000000.0*3229.0/25.0*mBrain*Brain.powi(-1)*Compartment_9;
-    let mgAdipose = 1.0/1000000.0*3229.0/25.0*mAdipose*Adipose.powi(-1)*Compartment_10;
+    let mgUrine = 0.00012916*Compartment_5*mUrine*Urine.powi(-1);
+    let mgFeces = 0.00012916*Compartment_6*mFeces*Feces.powi(-1);
+    let mgIntestineLumen = 0.00012916*Compartment_0*mIntestineLumen*IntestineLumen.powi(-1);
+    let mgStomachLumen = 0.00012916*Compartment_18*mStomachLumen*StomachLumen.powi(-1);
+    let mgLiver = 0.00012916*Compartment_1*mLiver*Liver.powi(-1);
+    let mgKidneyPlasma = 0.00012916*Compartment_2*mKidneyPlasma*KidneyPlasma.powi(-1);
+    let mgRemainder = 0.00012916*Compartment_3*mRemainder*Remainder.powi(-1);
+    let mgPlasmaVenous = 0.00012916*Compartment_4*mPlasmaVenous*PlasmaVenous.powi(-1);
+    let mgHeart = 0.00012916*Compartment_7*mHeart*Heart.powi(-1);
+    let mgMuscle = 0.00012916*Compartment_8*mMuscle*Muscle.powi(-1);
+    let mgBrain = 0.00012916*Compartment_9*mBrain*Brain.powi(-1);
+    let mgAdipose = 0.00012916*Compartment_10*mAdipose*Adipose.powi(-1);
     let mArterialPlasma__for_kidney = mPlasmaArterial*PlasmaArterial.powi(-1);
-    let mgPlasmaArterial = 1.0/1000000.0*3229.0/25.0*mPlasmaArterial*PlasmaArterial.powi(-1)*Compartment_11;
-    let mgLung = 1.0/1000000.0*3229.0/25.0*mLung*Lung.powi(-1)*Compartment_12;
-    let mgPortalVein = 1.0/1000000.0*3229.0/25.0*mPortalVein*PortalVein.powi(-1)*Compartment_13;
-    let mgStomach = 1.0/1000000.0*3229.0/25.0*mStomach*Stomach.powi(-1)*Compartment_14;
-    let mgIntestineEnterocytes = 1.0/1000000.0*3229.0/25.0*mIntestineEnterocytes*IntestineEnterocytes.powi(-1)*Compartment_15;
-    let mgKidneyTissues = 1.0/1000000.0*3229.0/25.0*Compartment_16*mKidneyTissue*KidneyTissue.powi(-1);
-    let mgIntestineVascular = 1.0/1000000.0*3229.0/25.0*mIntestineVascular*IntestineVascular.powi(-1)*Compartment_17;
-    let mIntestineSum = (mIntestineEnterocytes*IntestineEnterocytes.powi(-1)*Compartment_15 + Compartment_17*mIntestineVascular*IntestineVascular.powi(-1))*(Compartment_15 + Compartment_17).powi(-1);
-    let mKidneySum = (Compartment_19*mKidneyTubular*KidneyTubular.powi(-1) + (Compartment_16*mKidneyTissue*KidneyTissue.powi(-1) + Compartment_2*mKidneyPlasma*KidneyPlasma.powi(-1)))*(Compartment_19 + (Compartment_16 + Compartment_2)).powi(-1);
-    let mgKidneyTubular = 1.0/1000000.0*3229.0/25.0*Compartment_19*mKidneyTubular*KidneyTubular.powi(-1);
-    let mgIntestineTotal = mgIntestineEnterocytes + mgIntestineVascular;
-    let mgKidneyTotal = mgKidneyTubular + (mgKidneyPlasma + mgKidneyTissues);
+    let mgPlasmaArterial = 0.00012916*Compartment_11*mPlasmaArterial*PlasmaArterial.powi(-1);
+    let mgLung = 0.00012916*Compartment_12*mLung*Lung.powi(-1);
+    let mgPortalVein = 0.00012916*Compartment_13*mPortalVein*PortalVein.powi(-1);
+    let mgStomach = 0.00012916*Compartment_14*mStomach*Stomach.powi(-1);
+    let mgIntestineEnterocytes = 0.00012916*Compartment_15*mIntestineEnterocytes*IntestineEnterocytes.powi(-1);
+    let mgKidneyTissues = 0.00012916*Compartment_16*mKidneyTissue*KidneyTissue.powi(-1);
+    let mgIntestineVascular = 0.00012916*Compartment_17*mIntestineVascular*IntestineVascular.powi(-1);
+    let mIntestineSum = (Compartment_15 + Compartment_17).powi(-1)*(Compartment_15*mIntestineEnterocytes*IntestineEnterocytes.powi(-1) + Compartment_17*mIntestineVascular*IntestineVascular.powi(-1));
+    let mKidneySum = (Compartment_16 + Compartment_19 + Compartment_2).powi(-1)*(Compartment_16*mKidneyTissue*KidneyTissue.powi(-1) + Compartment_19*mKidneyTubular*KidneyTubular.powi(-1) + Compartment_2*mKidneyPlasma*KidneyPlasma.powi(-1));
+    let mgKidneyTubular = 0.00012916*Compartment_19*mKidneyTubular*KidneyTubular.powi(-1);
 
         // Temporary variables (CSE)
         let x0 = PlasmaArterial.powi(-1);
@@ -401,33 +401,29 @@ pub fn run_simulation(params: &str) -> String {
         let mKidneyTubular = y[19];
 
         // Assignment Rules
-    let mgUrine = 1.0/1000000.0*3229.0/25.0*mUrine*Urine.powi(-1)*Compartment_5;
-    let mgFeces = 1.0/1000000.0*3229.0/25.0*mFeces*Feces.powi(-1)*Compartment_6;
-    let mgIntestineLumen = 1.0/1000000.0*3229.0/25.0*mIntestineLumen*IntestineLumen.powi(-1)*Compartment_0;
-    let mgStomachLumen = 1.0/1000000.0*3229.0/25.0*mStomachLumen*StomachLumen.powi(-1)*Compartment_18;
-    let QPortalVeinOut = ModelValue_37 + (ModelValue_35 + ModelValue_36);
-    let QLiverOut = ModelValue_34 + ModelValue_47;
-    let mgLiver = 1.0/1000000.0*3229.0/25.0*mLiver*Liver.powi(-1)*Compartment_1;
-    let mgKidneyPlasma = 1.0/1000000.0*3229.0/25.0*mKidneyPlasma*KidneyPlasma.powi(-1)*Compartment_2;
-    let mgRemainder = 1.0/1000000.0*3229.0/25.0*mRemainder*Remainder.powi(-1)*Compartment_3;
-    let mgPlasmaVenous = 1.0/1000000.0*3229.0/25.0*mPlasmaVenous*PlasmaVenous.powi(-1)*Compartment_4;
-    let mgHeart = 1.0/1000000.0*3229.0/25.0*mHeart*Heart.powi(-1)*Compartment_7;
-    let mgMuscle = 1.0/1000000.0*3229.0/25.0*mMuscle*Muscle.powi(-1)*Compartment_8;
-    let mgBrain = 1.0/1000000.0*3229.0/25.0*mBrain*Brain.powi(-1)*Compartment_9;
-    let mgAdipose = 1.0/1000000.0*3229.0/25.0*mAdipose*Adipose.powi(-1)*Compartment_10;
+    let mgUrine = 0.00012916*Compartment_5*mUrine*Urine.powi(-1);
+    let mgFeces = 0.00012916*Compartment_6*mFeces*Feces.powi(-1);
+    let mgIntestineLumen = 0.00012916*Compartment_0*mIntestineLumen*IntestineLumen.powi(-1);
+    let mgStomachLumen = 0.00012916*Compartment_18*mStomachLumen*StomachLumen.powi(-1);
+    let mgLiver = 0.00012916*Compartment_1*mLiver*Liver.powi(-1);
+    let mgKidneyPlasma = 0.00012916*Compartment_2*mKidneyPlasma*KidneyPlasma.powi(-1);
+    let mgRemainder = 0.00012916*Compartment_3*mRemainder*Remainder.powi(-1);
+    let mgPlasmaVenous = 0.00012916*Compartment_4*mPlasmaVenous*PlasmaVenous.powi(-1);
+    let mgHeart = 0.00012916*Compartment_7*mHeart*Heart.powi(-1);
+    let mgMuscle = 0.00012916*Compartment_8*mMuscle*Muscle.powi(-1);
+    let mgBrain = 0.00012916*Compartment_9*mBrain*Brain.powi(-1);
+    let mgAdipose = 0.00012916*Compartment_10*mAdipose*Adipose.powi(-1);
     let mArterialPlasma__for_kidney = mPlasmaArterial*PlasmaArterial.powi(-1);
-    let mgPlasmaArterial = 1.0/1000000.0*3229.0/25.0*mPlasmaArterial*PlasmaArterial.powi(-1)*Compartment_11;
-    let mgLung = 1.0/1000000.0*3229.0/25.0*mLung*Lung.powi(-1)*Compartment_12;
-    let mgPortalVein = 1.0/1000000.0*3229.0/25.0*mPortalVein*PortalVein.powi(-1)*Compartment_13;
-    let mgStomach = 1.0/1000000.0*3229.0/25.0*mStomach*Stomach.powi(-1)*Compartment_14;
-    let mgIntestineEnterocytes = 1.0/1000000.0*3229.0/25.0*mIntestineEnterocytes*IntestineEnterocytes.powi(-1)*Compartment_15;
-    let mgKidneyTissues = 1.0/1000000.0*3229.0/25.0*Compartment_16*mKidneyTissue*KidneyTissue.powi(-1);
-    let mgIntestineVascular = 1.0/1000000.0*3229.0/25.0*mIntestineVascular*IntestineVascular.powi(-1)*Compartment_17;
-    let mIntestineSum = (mIntestineEnterocytes*IntestineEnterocytes.powi(-1)*Compartment_15 + Compartment_17*mIntestineVascular*IntestineVascular.powi(-1))*(Compartment_15 + Compartment_17).powi(-1);
-    let mKidneySum = (Compartment_19*mKidneyTubular*KidneyTubular.powi(-1) + (Compartment_16*mKidneyTissue*KidneyTissue.powi(-1) + Compartment_2*mKidneyPlasma*KidneyPlasma.powi(-1)))*(Compartment_19 + (Compartment_16 + Compartment_2)).powi(-1);
-    let mgKidneyTubular = 1.0/1000000.0*3229.0/25.0*Compartment_19*mKidneyTubular*KidneyTubular.powi(-1);
-    let mgIntestineTotal = mgIntestineEnterocytes + mgIntestineVascular;
-    let mgKidneyTotal = mgKidneyTubular + (mgKidneyPlasma + mgKidneyTissues);
+    let mgPlasmaArterial = 0.00012916*Compartment_11*mPlasmaArterial*PlasmaArterial.powi(-1);
+    let mgLung = 0.00012916*Compartment_12*mLung*Lung.powi(-1);
+    let mgPortalVein = 0.00012916*Compartment_13*mPortalVein*PortalVein.powi(-1);
+    let mgStomach = 0.00012916*Compartment_14*mStomach*Stomach.powi(-1);
+    let mgIntestineEnterocytes = 0.00012916*Compartment_15*mIntestineEnterocytes*IntestineEnterocytes.powi(-1);
+    let mgKidneyTissues = 0.00012916*Compartment_16*mKidneyTissue*KidneyTissue.powi(-1);
+    let mgIntestineVascular = 0.00012916*Compartment_17*mIntestineVascular*IntestineVascular.powi(-1);
+    let mIntestineSum = (Compartment_15 + Compartment_17).powi(-1)*(Compartment_15*mIntestineEnterocytes*IntestineEnterocytes.powi(-1) + Compartment_17*mIntestineVascular*IntestineVascular.powi(-1));
+    let mKidneySum = (Compartment_16 + Compartment_19 + Compartment_2).powi(-1)*(Compartment_16*mKidneyTissue*KidneyTissue.powi(-1) + Compartment_19*mKidneyTubular*KidneyTubular.powi(-1) + Compartment_2*mKidneyPlasma*KidneyPlasma.powi(-1));
+    let mgKidneyTubular = 0.00012916*Compartment_19*mKidneyTubular*KidneyTubular.powi(-1);
 
         // Temporary variables (CSE)
         let x0 = PlasmaArterial.powi(-1);
@@ -682,11 +678,10 @@ pub fn run_simulation(params: &str) -> String {
             Ok(OdeSolverStopReason::RootFound(root_idx)) => {
                 console_log!("Event triggered at t={}", solver.state().t);
                 match root_idx {
-                    0.0 => {
+                    0 => {
                         // Event: Oral_at_0_001
-                        let mStomachLumen = solver.state().y[18];
-                        solver.state_mut().y[18] = (mStomachLumen*StomachLumen.powi(-1) + 1000000.0_f64*ModelValue_0*(3229.0/25.0*Compartment_18).powi(-1))*StomachLumen;
-                        console_log!("  mStomachLumen = {}", (mStomachLumen*StomachLumen.powi(-1) + 1000000.0_f64*ModelValue_0*(3229.0/25.0*Compartment_18).powi(-1))*StomachLumen);
+                        solver.state_mut().y[18] = StomachLumen*(mStomachLumen*StomachLumen.powi(-1) + 7742.33508826262*ModelValue_0*Compartment_18.powi(-1));
+                        console_log!("  mStomachLumen = {}", StomachLumen*(mStomachLumen*StomachLumen.powi(-1) + 7742.33508826262*ModelValue_0*Compartment_18.powi(-1)));
                     },
                     _ => console_log!("Unknown event index: {}", root_idx),
                 }

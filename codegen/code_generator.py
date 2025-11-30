@@ -12,6 +12,20 @@ class RustBlockGenerator:
     def __init__(self):
         """Initialize code block generator"""
         self.code_gen = RustCodeGenerator()
+    
+    def generate(self, expr: sympy.Expr) -> str:
+        """Generate Rust code from SymPy expression
+        
+        This is a convenience method used by event generator and other components.
+        
+        Args:
+            expr: SymPy expression to convert to Rust
+            
+        Returns:
+            Rust code string
+        """
+        return self.code_gen.generate(expr)
+
 
     def generate_temp_vars(self, replacements: List[Tuple[sympy.Symbol, sympy.Expr]]) -> str:
         """Generate temporary variable declarations from CSE
@@ -224,12 +238,14 @@ class RustBlockGenerator:
 
     def generate_assignment_rules(
         self,
-        assignment_rules: List[Tuple[str, sympy.Expr]]
+        assignment_rules: List[Tuple[str, sympy.Expr]],
+        add_type_annotation: bool = False
     ) -> str:
         """Generate code for assignment rule calculations
 
         Args:
             assignment_rules: List of (variable, expression) tuples in dependency order
+            add_type_annotation: If True, add `: f64` type annotation (for static rules)
 
         Returns:
             Rust code block with assignment calculations
@@ -237,8 +253,8 @@ class RustBlockGenerator:
         Example:
             Input: [("Fat", BM * scVFat), ("VBlood", BM * scVBlood)]
             Output:
-                let Fat = BM * scVFat;
-                let VBlood = BM * scVBlood;
+                let Fat: f64 = BM * scVFat;
+                let VBlood: f64 = BM * scVBlood;
         """
         if not assignment_rules:
             return ""
@@ -246,7 +262,10 @@ class RustBlockGenerator:
         assignment_code = []
         for variable, expr in assignment_rules:
             rust_expr = self.code_gen.generate_code_with_formatting(expr)
-            assignment_code.append(f"    let {variable} = {rust_expr};")
+            if add_type_annotation:
+                assignment_code.append(f"    let {variable}: f64 = {rust_expr};")
+            else:
+                assignment_code.append(f"    let {variable} = {rust_expr};")
 
         return "\n".join(assignment_code)
 

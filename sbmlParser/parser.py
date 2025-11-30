@@ -154,10 +154,8 @@ def ParseReaction(reactionIndex, reaction):
     if rateLawObject.getMath() != None:
         # Use MathML for better parsing with sbmlmath (improved operator precedence)
         newReaction.rateLaw = libsbml.writeMathMLToString(rateLawObject.getMath())
-    #        outputFile.write(formulaToString(rateLaw.getMath()) + "\n")
     else:
         raise Exception("Rate law defined by plugin that is not currently supported")
-    #        outputFile.write("None\n")
 
     numRateLawParams = rateLawObject.getNumParameters()
 

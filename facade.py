@@ -3,15 +3,15 @@
 
 import sympy
 from typing import Dict, Any
-from .models.sbml_model import SbmlModel
-from .parsers.expression_parser import SbmlExpressionParser
-from .symbolic.ode_builder import OdeSystemBuilder
-from .symbolic.jacobian_builder import JacobianBuilder
-from .symbolic.optimizer import SymbolicOptimizer
-from .symbolic.assignment_processor import AssignmentRuleProcessor
-from .codegen.code_generator import RustBlockGenerator
-from .codegen.template_manager import RustTemplateManager
-from .codegen.event_generator import EventCodeGenerator
+from models.sbml_model import SbmlModel
+from parsers.expression_parser import SbmlExpressionParser
+from symbolic.ode_builder import OdeSystemBuilder
+from symbolic.jacobian_builder import JacobianBuilder
+from symbolic.optimizer import SymbolicOptimizer
+from symbolic.assignment_processor import AssignmentRuleProcessor
+from codegen.code_generator import RustBlockGenerator
+from codegen.template_manager import RustTemplateManager
+from codegen.event_generator import EventCodeGenerator
 
 
 class SbmlToRustConverter:
@@ -42,7 +42,23 @@ class SbmlToRustConverter:
         self.species_map = {s_id: i for i, s_id in enumerate(self.model.species.keys())}
         self.species_list = list(self.model.species.keys())
 
+
         self.params_map = {p_id: p.value for p_id, p in self.model.parameters.items()}
+
+        # Merge local reaction parameters into global parameter map
+        # This fixes the Zake2021 issue where Km, V, k1, k2 are defined locally
+        for rxn_id, rxn_data_dict in self.model_data.get("reactions", {}).items():
+            local_params = rxn_data_dict.get("rxnParameters", [])
+            for param_id, param_value in local_params:
+                # Check for name collision
+                if param_id in self.params_map:
+                    # Use reaction-qualified name
+                    qualified_name = f"{rxn_id}_{param_id}"
+                    self.params_map[qualified_name] = param_value
+                    print(f"Warning: Parameter '{param_id}' collision in reaction '{rxn_id}', using '{qualified_name}'")
+                else:
+                    self.params_map[param_id] = param_value
+
 
         self.compartments_map = {
             c_id: c.size for c_id, c in self.model.compartments.items()
@@ -164,6 +180,48 @@ class SbmlToRustConverter:
         species_fields, param_fields = self.template_manager.generate_struct_fields(
             self.species_list, filtered_params, filtered_compartments, species_initial_amounts
         )
+        
+        # Classify rules into static and dynamic
+        # First, determine which variables are from initial assignments (these are static)
+        # Classify initial assignments into static (param-only) and dynamic (rule-dependent)
+        initial_assignments = self.model_data.get("initialAssignments", {})
+        initial_assignment_rules = []
+        for ia in initial_assignments.values():
+            if ia.get("variable") and ia.get("math"):
+                expr = self.expression_parser.parse(ia.get("math"))
+                initial_assignment_rules.append((ia.get("variable"), expr))
+        
+        # We use a fresh analyzer for this, knowing only parameters are static initially
+        from core.dependency_analyzer import DependencyAnalyzer
+        # Only use filtered_params and filtered_compartments (constants), not all params (which include rules)
+        constant_vars = list(filtered_params.keys()) + list(filtered_compartments.keys())
+        
+        ia_analyzer = DependencyAnalyzer(self.species_list, constant_vars)
+        static_ia, dynamic_ia = ia_analyzer.classify_rules(initial_assignment_rules)
+        
+        # Initialize DependencyAnalyzer for assignment rules
+        # Now we know which initial assignments are static (available for static rules)
+        static_ia_vars = {var for var, _ in static_ia}
+        dynamic_ia_vars = {var for var, _ in dynamic_ia}
+        all_static_base = list(self.params_map.keys()) + list(static_ia_vars)
+        dependency_analyzer = DependencyAnalyzer(self.species_list, all_static_base)
+        
+        # Pass dynamic_ia_vars so rules depending on them are classified as dynamic
+        static_rules, dynamic_rules = dependency_analyzer.classify_rules(assignment_rules, dynamic_ia_vars)
+        
+        # Re-classify dynamic_ia based on whether they depend on assignment rules
+        # Some dynamic IAs might depend on dynamic assignment rules
+        assignment_rule_vars = {var for var, _ in assignment_rules}
+        dynamic_ia_before_rules = []
+        dynamic_ia_after_rules = []
+        
+        for var, expr in dynamic_ia:
+            symbols = {str(s) for s in expr.free_symbols}
+            # Check if depends on any assignment rule
+            if symbols & assignment_rule_vars:
+                dynamic_ia_after_rules.append((var, expr))
+            else:
+                dynamic_ia_before_rules.append((var, expr))
 
         # Generate code blocks
         code_blocks = {
@@ -172,11 +230,20 @@ class SbmlToRustConverter:
             "param_extract": self.code_generator.generate_parameter_extraction(
                 filtered_params, filtered_compartments
             ),
-            "assignment_rules": self.code_generator.generate_assignment_rules(
-                assignment_rules
+            "static_assignment_rules": self.code_generator.generate_assignment_rules(
+                static_rules, add_type_annotation=True
             ),
-            "initial_assignments": self.code_generator.generate_initial_assignments(
-                initial_assignments, self.expression_parser
+            "assignment_rules": self.code_generator.generate_assignment_rules(
+                dynamic_rules
+            ),
+            "initial_assignments_static": self.code_generator.generate_assignment_rules(
+                static_ia
+            ),
+            "initial_assignments_dynamic_before": self.code_generator.generate_assignment_rules(
+                dynamic_ia_before_rules
+            ),
+            "initial_assignments_dynamic_after": self.code_generator.generate_assignment_rules(
+                dynamic_ia_after_rules
             ),
             "species_extract": self.code_generator.generate_species_extraction(
                 self.species_map
